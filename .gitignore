@@ -1,0 +1,9 @@
+node_modules/
+dist/
+out/
+.env
+.env.local
+*.wav
+*.mp3
+models/
+.DS_Store
