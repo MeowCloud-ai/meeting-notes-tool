@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import App from './App';
 
 // Mock chrome.runtime
 const mockSendMessage = vi.fn();
@@ -8,7 +7,23 @@ vi.stubGlobal('chrome', {
   runtime: {
     sendMessage: mockSendMessage,
   },
+  identity: {
+    getAuthToken: vi.fn(),
+    removeCachedAuthToken: vi.fn(),
+  },
 });
+
+// Mock auth - simulate logged-in user
+vi.mock('../lib/auth', () => ({
+  authManager: {
+    getSession: vi.fn().mockResolvedValue({
+      user: { id: 'user-1', email: 'test@example.com', user_metadata: { full_name: 'Test User' } },
+    }),
+    onAuthStateChange: vi.fn().mockReturnValue(() => {}),
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  },
+}));
 
 // Mock supabase for RecordingList
 vi.mock('../lib/supabase', () => ({
@@ -20,6 +35,9 @@ vi.mock('../lib/supabase', () => ({
         }),
       }),
     }),
+    auth: {
+      onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
+    },
   },
 }));
 
@@ -37,9 +55,18 @@ describe('App', () => {
     });
   });
 
-  it('renders title', async () => {
+  it('renders title after auth', async () => {
     render(<App />);
-    expect(screen.getByText('🐱 MeowMeet')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('🐱 MeowMeet')).toBeInTheDocument();
+    });
+  });
+
+  it('shows user menu when authenticated', async () => {
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByTestId('user-menu')).toBeInTheDocument();
+    });
   });
 
   it('shows start button in idle state', async () => {
@@ -96,7 +123,9 @@ describe('App', () => {
 
   it('shows timer', async () => {
     render(<App />);
-    expect(screen.getByTestId('timer')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('timer')).toBeInTheDocument();
+    });
   });
 
   it('shows empty recording list', async () => {
@@ -106,3 +135,6 @@ describe('App', () => {
     });
   });
 });
+
+// Need to import after mocks
+import App from './App';
