@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import RecordButton from './components/RecordButton';
 import Timer from './components/Timer';
 import RecordingList from './components/RecordingList';
+import RecordingDetail from './pages/RecordingDetail';
+import type { Recording } from '../types/database';
 
 interface AppState {
   isRecording: boolean;
@@ -20,6 +22,7 @@ const INITIAL_STATE: AppState = {
 export default function App() {
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
 
   const fetchState = useCallback(async () => {
     try {
@@ -50,6 +53,17 @@ export default function App() {
     }
   };
 
+  if (selectedRecording) {
+    return (
+      <div className="w-80 p-4" style={{ minHeight: '400px' }}>
+        <RecordingDetail
+          recording={selectedRecording}
+          onBack={() => setSelectedRecording(null)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="w-80 p-4 flex flex-col gap-4">
       <h1 className="text-xl font-bold text-center">🐱 MeowMeet</h1>
@@ -68,7 +82,7 @@ export default function App() {
 
       <hr className="border-gray-200" />
 
-      <RecordingList />
+      <RecordingList onSelectRecording={setSelectedRecording} />
     </div>
   );
 }

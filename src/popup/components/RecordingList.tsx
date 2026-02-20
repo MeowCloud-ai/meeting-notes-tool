@@ -3,7 +3,11 @@ import { supabase } from '../../lib/supabase';
 import type { Recording } from '../../types/database';
 import RecordingItem from './RecordingItem';
 
-export default function RecordingList() {
+interface RecordingListProps {
+  onSelectRecording: (recording: Recording) => void;
+}
+
+export default function RecordingList({ onSelectRecording }: RecordingListProps) {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +38,11 @@ export default function RecordingList() {
     <div className="flex flex-col gap-2">
       <h2 className="text-sm font-semibold text-gray-700">歷史錄音</h2>
       {recordings.map((rec) => (
-        <RecordingItem key={rec.id} recording={rec} />
+        <RecordingItem
+          key={rec.id}
+          recording={rec}
+          onClick={() => onSelectRecording(rec)}
+        />
       ))}
     </div>
   );
