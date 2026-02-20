@@ -1,169 +1,125 @@
-# ARCHITECTURE.md — MeowMeet 技術架構
+# MeowMeet — 系統架構
 
-## 系統架構圖
+## 架構總覽
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    Electron App                      │
-│                                                      │
-│  ┌──────────────┐     ┌──────────────────────────┐  │
-│  │  Renderer     │     │  Main Process             │  │
-│  │  (React UI)   │     │                           │  │
-│  │               │     │  ┌─────────────────────┐  │  │
-│  │  - 控制面板    │ IPC │  │  Audio Capture       │  │  │
-│  │  - 狀態顯示    │◄───►│  │  (BlackHole input)   │  │  │
-│  │  - 設定頁面    │     │  └──────────┬──────────┘  │  │
-│  │  - 歷史紀錄    │     │             ↓              │  │
-│  │               │     │  ┌─────────────────────┐  │  │
-│  └──────────────┘     │  │  Audio Chunker       │  │  │
-│                        │  │  (每 3-5 分鐘切段)    │  │  │
-│                        │  └──────────┬──────────┘  │  │
-│                        │             ↓              │  │
-│                        │  ┌─────────────────────┐  │  │
-│                        │  │  Transcription       │  │  │
-│                        │  │  (Whisper local)     │  │  │
-│                        │  └──────────┬──────────┘  │  │
-│                        │             ↓              │  │
-│                        │  ┌─────────────────────┐  │  │
-│                        │  │  Speaker Diarize     │  │  │
-│                        │  │  (v0.2)              │  │  │
-│                        │  └──────────┬──────────┘  │  │
-│                        │             ↓              │  │
-│                        │  ┌─────────────────────┐  │  │
-│                        │  │  Segment Store       │  │  │
-│                        │  │  (本機暫存)           │  │  │
-│                        │  └──────────┬──────────┘  │  │
-│                        │             ↓ (會議結束)    │  │
-│                        │  ┌─────────────────────┐  │  │
-│                        │  │  LLM Summarizer      │  │  │
-│                        │  │  (Gemini API)        │  │  │
-│                        │  └──────────┬──────────┘  │  │
-│                        │             ↓              │  │
-│                        │  ┌─────────────────────┐  │  │
-│                        │  │  Output Manager      │  │  │
-│                        │  │  ├── Google Docs API  │  │  │
-│                        │  │  └── Gmail API        │  │  │
-│                        │  └─────────────────────┘  │  │
-│                        └──────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│         Chrome Extension (MV3)          │
+│  ┌──────────┐ ┌───────────┐ ┌────────┐ │
+│  │  Popup   │ │ Background│ │Content │ │
+│  │  (React) │ │ Service   │ │ Script │ │
+│  │          │ │ Worker    │ │        │ │
+│  └────┬─────┘ └─────┬─────┘ └───┬────┘ │
+│       │   message    │           │      │
+│       └──────────────┘           │      │
+└──────────────┬───────────────────┘      │
+               │ HTTPS                     
+               ▼                           
+┌─────────────────────────────────────────┐
+│           Supabase Backend              │
+│  ┌────────┐ ┌─────────┐ ┌───────────┐  │
+│  │  Auth   │ │ Storage │ │   Edge    │  │
+│  │(Google) │ │ (音檔)  │ │ Functions │  │
+│  └────────┘ └─────────┘ └─────┬─────┘  │
+│  ┌─────────────────────────────┘        │
+│  │  PostgreSQL                          │
+│  │  ├── users                           │
+│  │  ├── recordings                      │
+│  │  ├── transcripts                     │
+│  │  └── summaries                       │
+│  └──────────────────────────────────────│
+└──────────────┬──────────────────────────┘
+               │
+    ┌──────────┼──────────┐
+    ▼                     ▼
+┌─────────┐        ┌──────────┐
+│Deepgram │        │ Gemini   │
+│ (轉錄)  │        │ (摘要)   │
+└─────────┘        └──────────┘
 ```
 
-## 模組設計
+## Extension 層
 
-### 1. Audio Capture (`src/main/audio/`)
-- 使用 `node-audiorecorder` 或 Node.js `child_process` 呼叫 `sox`/`ffmpeg`
-- 輸入源：BlackHole 虛擬音訊裝置
-- 格式：WAV 16kHz mono（Whisper 最佳輸入）
-- 職責：開始/停止錄音、音量監測
+### Popup (React)
+- 錄音控制面板（開始/暫停/停止）
+- 錄音歷史列表
+- 逐字稿 + 摘要檢視
+- 用量統計 + 登入狀態
 
-### 2. Audio Chunker (`src/main/chunker/`)
-- 每 3-5 分鐘（可設定）切一段
-- 切段時避免切在句子中間（靜音偵測）
-- 輸出：暫存 WAV 檔案
+### Background Service Worker
+- `chrome.tabCapture.capture()` 管理
+- `MediaRecorder` 錄音（WebM/Opus）
+- 5 分鐘分段 + 即時上傳 Supabase Storage
+- IndexedDB 暫存未上傳片段
+- Badge 狀態管理
 
-### 3. Transcription Engine (`src/main/transcription/`)
-- 包裝 whisper.cpp（透過 node-addon 或 child_process）
-- 或用 Python subprocess 呼叫 faster-whisper
-- 參數：language=zh, model=small
-- 輸出：帶時間戳的文字段落
+### Content Script
+- 合規提示注入（錄音通知）
+- 頁面內錄音指示器
 
-### 4. Speaker Diarization (`src/main/diarization/`) — v0.2
-- 使用 pyannote-audio（Python subprocess）
-- 輸入：WAV 音檔
-- 輸出：時間段 + 講者標籤
-- 與轉錄結果合併
+## Supabase 層
 
-### 5. Segment Store (`src/main/store/`)
-- 本機 SQLite 或 JSON 檔案
-- 儲存每段的：時間、轉錄文字、講者、狀態
-- 支援會議歷史查詢
+### Auth
+- Google OAuth (chrome.identity API → signInWithIdToken)
 
-### 6. LLM Summarizer (`src/main/summarizer/`)
-- 彙整所有段落的轉錄文字
-- 呼叫 Gemini API 生成結構化摘要
-- Prompt 模板：
-  ```
-  你是會議紀錄助手。根據以下逐字稿，產出：
-  1. 會議摘要（3-5 句）
-  2. 行動項目清單（格式：- [ ] [負責人] [事項] [期限]）
-  3. 決策紀錄
-  4. 關鍵討論點
-  ```
+### Storage
+- `recordings` bucket（私有）
+- 路徑：`{user_id}/{recording_id}/{segment_N}.webm`
 
-### 7. Output Manager (`src/main/output/`)
-- **Google Docs**: 使用 googleapis SDK，建立文件、套用模板
-- **Gmail**: 使用 googleapis SDK，寄送摘要 Email
-- **OAuth**: 使用 Electron 的 BrowserWindow 做 OAuth flow
+### Edge Functions
+- `transcribe/`：接收音檔 → Deepgram Nova-2 → 逐字稿
+- `summarize/`：接收逐字稿 → Gemini Flash → 摘要
+
+### PostgreSQL
+- RLS：用戶只能存取自己的資料
+- Storage trigger → 自動觸發轉錄
 
 ## 目錄結構
 
 ```
-meeting-notes-tool/
-├── CLAUDE.md
-├── DECISIONS.md
-├── docs/
-│   ├── PRD.md
-│   ├── ARCHITECTURE.md
-│   └── TASKS.md
-├── .claude/
-│   └── agents/
-│       ├── coder.md
-│       └── reviewer.md
-├── .github/
-│   ├── workflows/
-│   │   └── ci.yml
-│   ├── PULL_REQUEST_TEMPLATE.md
-│   └── ISSUE_TEMPLATE/
-│       ├── feature.md
-│       └── bug.md
+meowmeet/
 ├── src/
-│   ├── main/                    # Electron Main Process
-│   │   ├── index.ts             # Entry point
-│   │   ├── audio/
-│   │   │   ├── capture.ts       # 音訊擷取
-│   │   │   └── chunker.ts       # 分段器
-│   │   ├── transcription/
-│   │   │   └── whisper.ts       # Whisper 包裝
-│   │   ├── diarization/
-│   │   │   └── speaker.ts       # 講者辨識 (v0.2)
-│   │   ├── summarizer/
-│   │   │   └── gemini.ts        # LLM 摘要
-│   │   ├── output/
-│   │   │   ├── googleDocs.ts    # Google Docs 輸出
-│   │   │   └── email.ts         # Email 輸出
-│   │   ├── store/
-│   │   │   └── segments.ts      # 段落暫存
-│   │   └── auth/
-│   │       └── google.ts        # OAuth 管理
-│   ├── renderer/                # Electron Renderer (React)
+│   ├── popup/          # React Popup UI
 │   │   ├── App.tsx
 │   │   ├── components/
-│   │   │   ├── ControlPanel.tsx # 開始/停止/暫停
-│   │   │   ├── StatusBar.tsx    # 錄音狀態
-│   │   │   ├── Settings.tsx     # 設定頁面
-│   │   │   └── History.tsx      # 歷史紀錄
-│   │   └── hooks/
-│   │       └── useRecording.ts
-│   └── shared/
-│       └── types.ts             # 共用型別
-├── scripts/
-│   └── setup-whisper.sh         # Whisper 模型下載
-├── package.json
+│   │   ├── hooks/
+│   │   └── pages/
+│   ├── background/     # Service Worker
+│   │   ├── index.ts
+│   │   ├── recorder.ts
+│   │   └── uploader.ts
+│   ├── content/        # Content Script (合規提示)
+│   │   └── index.ts
+│   ├── lib/            # 共用邏輯
+│   │   ├── supabase.ts
+│   │   ├── recorder.ts
+│   │   └── api.ts
+│   └── types/
+│       └── index.ts
+├── supabase/
+│   ├── migrations/     # DB Schema
+│   │   └── 001_init.sql
+│   └── functions/      # Edge Functions
+│       ├── transcribe/
+│       │   └── index.ts
+│       └── summarize/
+│           └── index.ts
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+├── public/
+│   └── icons/
+├── manifest.json
+├── vite.config.ts
 ├── tsconfig.json
-├── electron-builder.yml
-└── vitest.config.ts
+├── package.json
+└── .env.example
 ```
 
-## 技術依賴
+## 資料流
 
-| 套件 | 用途 |
-|------|------|
-| electron | 桌面框架 |
-| react + react-dom | UI |
-| googleapis | Google Docs + Gmail API |
-| @electron/remote | Main/Renderer 溝通 |
-| better-sqlite3 | 本機資料存儲 |
-| fluent-ffmpeg | 音訊處理 |
-| electron-builder | 打包發布 |
-| vitest | 測試 |
-| eslint + prettier | 程式碼品質 |
+1. **錄音**：User click → tabCapture → MediaRecorder → 5min segments → Supabase Storage
+2. **轉錄**：Storage trigger → Edge Function → Deepgram API → transcripts table
+3. **摘要**：Transcript ready → Edge Function → Gemini Flash → summaries table
+4. **檢視**：Popup → Supabase query → 顯示逐字稿/摘要

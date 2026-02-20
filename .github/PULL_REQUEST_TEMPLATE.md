@@ -1,18 +1,18 @@
 ## 📋 Description
-<!-- 簡述這個 PR 做了什麼 -->
+<!-- What does this PR do? -->
 
 ## 🔗 Related Issue
 Closes #
 
-## 🧪 Testing
-- [ ] Unit tests added/updated
-- [ ] Manual testing done
-- [ ] All tests passing
-
-## 📸 Screenshots (if UI changes)
+## 📝 Changes
+- 
 
 ## ✅ Checklist
-- [ ] TypeScript strict mode, no `any`
-- [ ] ESLint + Prettier pass
-- [ ] DECISIONS.md updated (if architecture change)
-- [ ] No hardcoded credentials
+- [ ] TypeScript strict — no `any`
+- [ ] Tests added/updated
+- [ ] `npm run lint` passes
+- [ ] `npm run typecheck` passes
+- [ ] `npm run test` passes
+- [ ] Documentation updated (if needed)
+
+## 📸 Screenshots (if UI changes)

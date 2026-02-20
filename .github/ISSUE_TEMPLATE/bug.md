@@ -7,17 +7,18 @@ labels: bug
 ## 🐛 Bug Description
 <!-- 簡述問題 -->
 
-## 📋 Steps to Reproduce
+## 🔄 Steps to Reproduce
 1. 
 2. 
 3. 
 
 ## ✅ Expected Behavior
+<!-- 預期行為 -->
 
 ## ❌ Actual Behavior
+<!-- 實際行為 -->
 
-## 📸 Screenshots
-
-## 🖥️ Environment
-- OS: macOS
-- App Version: 
+## 📋 Environment
+- Chrome version:
+- OS:
+- Extension version:

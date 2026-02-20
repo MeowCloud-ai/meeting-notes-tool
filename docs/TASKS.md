@@ -1,176 +1,198 @@
-# TASKS.md — 任務拆解
+# MeowMeet — 任務拆解
 
-## MVP v0.1 任務清單
+## Sprint 0（專案骨架）— 1 天
 
-### Sprint 1: 專案基礎 (Day 1)
+### Task 1: 專案初始化
+- **Issue**: #15
+- **Branch**: `feat/task-1-project-init`
+- **依賴**: 無
+- **子任務**:
+  - [ ] `npm create vite@latest` with React + TS template
+  - [ ] 設定 manifest.json (MV3)
+  - [ ] 安裝 Supabase JS client
+  - [ ] 設定 ESLint + Prettier
+  - [ ] 設定 Vitest
+  - [ ] 設定 vite.config.ts (Chrome Extension build)
+  - [ ] 驗證 `npm run build` 成功
+  - [ ] 驗證 Chrome 載入 unpacked extension 成功
+- **驗收**: Extension 可載入 Chrome，Popup 顯示 Hello World
 
-#### Task 1: 專案初始化
-- **Issue**: #1
-- **Branch**: `feat/project-setup`
-- **內容**:
-  - Electron + TypeScript + React 專案建立
-  - ESLint + Prettier 設定
-  - Vitest 設定
-  - electron-builder 設定
-  - 目錄結構建立
-- **驗收條件**: `npm run dev` 可啟動 Electron 視窗，顯示 Hello World
-
-#### Task 2: CI Pipeline
-- **Issue**: #2
-- **Branch**: `feat/ci-pipeline`
-- **內容**:
-  - GitHub Actions: build + lint + test
-  - PR Template
-  - Issue Templates (feature / bug)
-- **驗收條件**: PR 觸發 CI，全部 pass
-
----
-
-### Sprint 2: 音訊核心 (Day 2-3)
-
-#### Task 3: 音訊擷取模組
-- **Issue**: #3
-- **Branch**: `feat/audio-capture`
+### Task 2: Supabase Schema 設計
+- **Issue**: #16
+- **Branch**: `feat/task-2-supabase-schema`
 - **依賴**: Task 1
-- **內容**:
-  - BlackHole 音訊輸入偵測
-  - 開始/停止錄音
-  - 音量監測（VU meter）
-  - WAV 格式輸出（16kHz mono）
-- **驗收條件**: 能錄到 BlackHole 的音訊並存成 WAV
+- **子任務**:
+  - [ ] `supabase init`
+  - [ ] 建立 001_init.sql migration
+  - [ ] users table (id, email, display_name, plan_type, created_at)
+  - [ ] recordings table (id, user_id, title, duration, status, segment_count, created_at)
+  - [ ] transcripts table (id, recording_id, content, speakers, language, created_at)
+  - [ ] summaries table (id, recording_id, highlights, action_items, key_dialogues, created_at)
+  - [ ] RLS policies
+  - [ ] Storage bucket: recordings (private)
+  - [ ] `supabase db push` 驗證
+- **驗收**: Schema 可成功 apply，RLS 運作正常
 
-#### Task 4: 音訊分段器
-- **Issue**: #4
-- **Branch**: `feat/audio-chunker`
-- **依賴**: Task 3
-- **內容**:
-  - 每 N 分鐘（可設定，預設 3 分鐘）自動切段
-  - 靜音偵測避免切在句子中間
-  - 段落暫存管理
-- **驗收條件**: 10 分鐘錄音自動切成 3-4 段 WAV
+### Task 3: API Keys + 環境變數
+- **Issue**: #17
+- **Branch**: `feat/task-3-env-config`
+- **依賴**: Task 1
+- **子任務**:
+  - [ ] 建立 .env.example
+  - [ ] 建立 supabase/.env.example (Edge Function 用)
+  - [ ] 更新 .gitignore
+  - [ ] 文件說明各 key 取得方式
+- **驗收**: 新開發者可依 .env.example 設定環境
 
 ---
 
-### Sprint 3: 轉錄引擎 (Day 3-4)
+## Sprint 1（核心錄音）— 5 天
 
-#### Task 5: Whisper 整合
-- **Issue**: #5
-- **Branch**: `feat/whisper-integration`
+### Task 4: tabCapture 錄音功能
+- **Issue**: #18
+- **Branch**: `feat/task-4-tab-capture`
+- **依賴**: Task 1
+- **子任務**:
+  - [ ] Background SW: chrome.tabCapture.capture()
+  - [ ] MediaRecorder 設定 (WebM/Opus)
+  - [ ] Badge 狀態管理 (recording/idle)
+  - [ ] 錄音開始/停止 message handler
+  - [ ] 單元測試
+- **驗收**: 點擊 icon 可開始/停止錄音，badge 正確顯示
+
+### Task 5: 音訊編碼 + 分段上傳
+- **Issue**: #19
+- **Branch**: `feat/task-5-segment-upload`
+- **依賴**: Task 2, Task 4
+- **子任務**:
+  - [ ] MediaRecorder 5 分鐘 timeslice
+  - [ ] Supabase Storage upload 邏輯
+  - [ ] 重試機制 (max 3 retries)
+  - [ ] IndexedDB 暫存
+  - [ ] 上傳狀態追蹤
+  - [ ] 單元測試 + 整合測試
+- **驗收**: 6 分鐘錄音產生 2 個分段，均上傳成功
+
+### Task 6: 錄音 UI
+- **Issue**: #20
+- **Branch**: `feat/task-6-recording-ui`
 - **依賴**: Task 4
-- **內容**:
-  - whisper.cpp 或 faster-whisper 整合
-  - 模型下載腳本（setup-whisper.sh）
-  - 中文轉錄（language=zh）
-  - 帶時間戳輸出
-- **驗收條件**: 輸入 WAV → 輸出中文逐字稿（準確率 > 85%）
+- **子任務**:
+  - [ ] Popup 基本 layout (Tailwind CSS)
+  - [ ] 開始/暫停/停止按鈕
+  - [ ] 計時器顯示
+  - [ ] 狀態指示 (idle/recording/paused)
+  - [ ] 錄音歷史列表
+  - [ ] 與 Background SW 通訊
+- **驗收**: Popup 可控制錄音，狀態即時同步
 
-#### Task 6: 即時轉錄 Pipeline
-- **Issue**: #6
-- **Branch**: `feat/realtime-pipeline`
-- **依賴**: Task 4, 5
-- **內容**:
-  - 音訊切段 → 自動送轉錄 → 暫存結果
-  - 進度回報到 UI
-  - 錯誤重試機制
-- **驗收條件**: 錄音過程中，每段自動轉錄完成，UI 顯示進度
-
----
-
-### Sprint 4: AI 摘要 + 輸出 (Day 5-6)
-
-#### Task 7: Gemini 摘要模組
-- **Issue**: #7
-- **Branch**: `feat/gemini-summarizer`
-- **依賴**: Task 6
-- **內容**:
-  - 彙整所有段落逐字稿
-  - Gemini API 呼叫（結構化 prompt）
-  - 輸出：摘要 + 行動項目 + 決策 + 討論點
-- **驗收條件**: 輸入逐字稿 → 輸出結構化 JSON 摘要
-
-#### Task 8: Google OAuth + Docs 輸出
-- **Issue**: #8
-- **Branch**: `feat/google-docs-output`
-- **依賴**: Task 7
-- **內容**:
-  - Electron OAuth flow（BrowserWindow）
-  - Token 安全存儲（safeStorage）
-  - Google Docs 建立 + 格式化
-  - 歸檔到指定資料夾
-- **驗收條件**: 自動建立 Google Doc，內容格式正確
-
-#### Task 9: Email 通知
-- **Issue**: #9
-- **Branch**: `feat/email-notification`
-- **依賴**: Task 7, 8
-- **內容**:
-  - Gmail API 寄送摘要
-  - Email 模板（HTML）
-  - 包含 Docs 連結
-  - 收件人設定
-- **驗收條件**: 收到格式正確的摘要 Email
+### Task 7: 錄音合規提示
+- **Issue**: #21
+- **Branch**: `feat/task-7-compliance`
+- **依賴**: Task 4
+- **子任務**:
+  - [ ] 確認對話框 UI
+  - [ ] Content Script 注入邏輯
+  - [ ] 「不再提示」設定
+  - [ ] 頁面內錄音指示器
+- **驗收**: 首次錄音顯示提示，確認後開始
 
 ---
 
-### Sprint 5: UI + 整合 (Day 7-8)
+## Sprint 2（轉錄 + 摘要）— 5 天
 
-#### Task 10: 控制面板 UI
-- **Issue**: #10
-- **Branch**: `feat/control-panel-ui`
-- **依賴**: Task 6
-- **內容**:
-  - 開始/停止/暫停按鈕
-  - 錄音時長顯示
-  - 音量指示器
-  - 轉錄進度條
-  - 系統匣常駐
-- **驗收條件**: UI 可控制完整錄音流程
+### Task 8: Deepgram 語音轉錄
+- **Issue**: #22
+- **Branch**: `feat/task-8-deepgram`
+- **依賴**: Task 5
+- **子任務**:
+  - [ ] Edge Function: transcribe/index.ts
+  - [ ] Deepgram SDK 整合
+  - [ ] 中文設定 (language: zh-TW)
+  - [ ] Speaker Diarization 設定
+  - [ ] 分段合併邏輯
+  - [ ] 結果存入 transcripts table
+  - [ ] 錯誤處理 + 重試
+  - [ ] 整合測試 (MSW mock)
+- **驗收**: 上傳音檔後自動產生中文逐字稿
 
-#### Task 11: 設定頁面
-- **Issue**: #11
-- **Branch**: `feat/settings-page`
-- **內容**:
-  - 音訊輸入裝置選擇
-  - 分段間隔設定
-  - Google 帳號管理
-  - Email 收件人設定
-  - Whisper 模型選擇
-- **驗收條件**: 設定可儲存並生效
+### Task 9: Gemini AI 摘要
+- **Issue**: #23
+- **Branch**: `feat/task-9-gemini-summary`
+- **依賴**: Task 8
+- **子任務**:
+  - [ ] Edge Function: summarize/index.ts
+  - [ ] Gemini Flash API 整合
+  - [ ] 摘要 prompt 設計
+  - [ ] Structured output (highlights + action_items + key_dialogues)
+  - [ ] 結果存入 summaries table
+  - [ ] 整合測試 (MSW mock)
+- **驗收**: 逐字稿完成後自動產生摘要
 
-#### Task 12: 首次使用引導
-- **Issue**: #12
-- **Branch**: `feat/onboarding`
-- **依賴**: Task 8, 11
-- **內容**:
-  - BlackHole 安裝檢測 + 引導
-  - 音訊權限請求
-  - Google OAuth 授權引導
-  - Whisper 模型下載進度
-- **驗收條件**: 新使用者能順利完成所有設定
-
----
-
-### Sprint 6: 打包發布 (Day 9)
-
-#### Task 13: 打包 + 測試
-- **Issue**: #13
-- **Branch**: `feat/build-release`
-- **內容**:
-  - electron-builder macOS DMG 打包
-  - 應用程式簽名（如有 Apple Developer）
-  - 端到端測試
-  - README 撰寫
-- **驗收條件**: 產出可安裝的 .dmg，完整流程可運作
+### Task 10: 轉錄 + 摘要 UI
+- **Issue**: #24
+- **Branch**: `feat/task-10-transcript-ui`
+- **依賴**: Task 8, Task 9
+- **子任務**:
+  - [ ] 錄音詳情頁面
+  - [ ] 逐字稿 Tab（含講者標記）
+  - [ ] 摘要 Tab（highlights + action items）
+  - [ ] Action Items 複製功能
+  - [ ] 搜尋逐字稿
+  - [ ] 狀態指示（轉錄中/完成）
+- **驗收**: 可查看錄音的逐字稿和摘要
 
 ---
 
-## 預估時程
-| Sprint | 天數 | 內容 |
-|--------|------|------|
-| 1 | 1 天 | 專案基礎 + CI |
-| 2 | 2 天 | 音訊擷取 + 分段 |
-| 3 | 2 天 | Whisper 轉錄 |
-| 4 | 2 天 | AI 摘要 + Google 輸出 |
-| 5 | 2 天 | UI + 整合 |
-| 6 | 1 天 | 打包發布 |
-| **Total** | **~10 天** | **MVP v0.1** |
+## Sprint 3（用戶系統 + 上架）— 4 天
+
+### Task 11: Google OAuth 登入
+- **Issue**: #25
+- **Branch**: `feat/task-11-google-auth`
+- **依賴**: Task 2
+- **子任務**:
+  - [ ] chrome.identity.getAuthToken() 設定
+  - [ ] Supabase Auth signInWithIdToken
+  - [ ] 登入/登出 UI
+  - [ ] Token refresh 機制
+  - [ ] 未登入狀態 redirect
+- **驗收**: 可用 Google 帳號登入/登出
+
+### Task 12: 免費方案限制
+- **Issue**: #26
+- **Branch**: `feat/task-12-free-plan`
+- **依賴**: Task 4, Task 11
+- **子任務**:
+  - [ ] 錄音計數邏輯 (3 場/月)
+  - [ ] 時長限制 (60 分鐘自動停止)
+  - [ ] 升級提示 UI
+  - [ ] 用量統計顯示
+  - [ ] Edge Function 驗證 (防繞過)
+  - [ ] 每月重置
+- **驗收**: 第 4 場錄音被擋，顯示升級提示
+
+### Task 13: Chrome Web Store 上架
+- **Issue**: #27
+- **Branch**: `feat/task-13-store-publish`
+- **依賴**: Task 1-12
+- **子任務**:
+  - [ ] manifest.json 完善
+  - [ ] Extension icon (16/32/48/128)
+  - [ ] 隱私政策頁面
+  - [ ] 截圖製作 (≥3 張)
+  - [ ] 宣傳圖片 (440x280)
+  - [ ] 權限說明
+  - [ ] 提交審核
+- **驗收**: 成功提交 Chrome Web Store 審核
+
+### Task 14: E2E 自動化測試
+- **Issue**: #28
+- **Branch**: `feat/task-14-e2e-tests`
+- **依賴**: Task 1-10
+- **子任務**:
+  - [ ] Playwright 設定
+  - [ ] Chrome Extension fixture
+  - [ ] TC-001 ~ TC-008 實作
+  - [ ] CI 整合
+  - [ ] 覆蓋率報告
+- **驗收**: CI 自動執行 E2E 測試，全部通過

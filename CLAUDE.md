@@ -1,39 +1,41 @@
-# CLAUDE.md — MeowMeet 開發指引
-
-## 專案概述
-- **名稱**: MeowMeet
-- **類型**: MacBook 桌面應用程式（Electron + TypeScript）
-- **目標**: Google Meet 會議期間即時擷取音訊，會後自動產生結構化會議紀錄
+# MeowMeet — 開發指引
 
 ## 技術棧
-- **框架**: Electron + TypeScript
-- **前端**: React（Electron renderer）
-- **音訊擷取**: BlackHole 虛擬音訊裝置 + Web Audio API / node-audiorecorder
-- **語音轉錄**: 本機 Whisper（whisper.cpp 或 faster-whisper）
-- **講者辨識**: pyannote-audio 或 speechbrain（Speaker Diarization）
-- **LLM 摘要**: Gemini API（已有 Key）
-- **輸出**: Google Docs API + Gmail API（OAuth 2.0）
-- **建置**: electron-builder
-- **測試**: Vitest
+- **Frontend**: React + Vite + TypeScript
+- **Extension**: Chrome Extension Manifest V3
+- **Backend**: Supabase (Auth + Storage + Edge Functions + PostgreSQL)
+- **外部 API**: Deepgram (轉錄), Gemini Flash (摘要)
+- **測試**: Vitest + Playwright
 
 ## 開發規範
-- TypeScript strict mode
+
+### TypeScript
+- `strict: true`，不允許 `any`
+- 使用 `unknown` + type guard 取代 `any`
+- 所有函數必須有明確的回傳型別
+
+### 程式碼風格
 - ESLint + Prettier
-- Functional components（React）
-- 命名：camelCase（變數/函數）、PascalCase（元件/型別）
-- 每個模組都要有對應測試
-- 每個 PR 都要有描述 + 關聯 Issue
+- 單引號，無分號（Prettier 預設）
+- 檔案命名：kebab-case
 
-## 架構重點
-- 音訊每 3-5 分鐘切一段，送轉錄 pipeline
-- Main process 負責音訊擷取 + 背景處理
-- Renderer process 負責 UI 顯示
-- 轉錄結果暫存本機，會議結束後統一送 LLM 摘要
-- Google OAuth token 存在 Electron secure storage
+### 測試
+- 每個模組都要有對應的 `.test.ts`
+- 使用 Vitest 作為測試框架
+- 覆蓋率目標 >80%
+- E2E 使用 Playwright
 
-## 注意事項
-- BlackHole 需要使用者手動安裝（提供安裝引導）
-- macOS 音訊權限需要使用者授權
-- Whisper 模型選 small 或 medium（平衡速度和品質）
-- 中文為主要語言，轉錄時指定 language=zh
-- 不要把 OAuth credentials commit 到 repo
+### Git 規範
+- Branch: `feat/task-N-description`, `fix/issue-N-description`
+- Commit: Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`)
+- PR 必須通過 CI 才能 merge
+
+### Chrome Extension
+- Manifest V3（不使用 Manifest V2 API）
+- Service Worker 不可使用 DOM API
+- 最小權限原則（只申請必要 permissions）
+
+### Supabase
+- 所有 table 必須設定 RLS
+- Edge Functions 使用 Deno runtime
+- Migration 檔案不可修改已部署的版本，只能新增

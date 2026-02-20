@@ -1,31 +1,79 @@
-# DECISIONS.md — 架構決策紀錄
+# MeowMeet — Architecture Decision Records
 
-## 2026-02-18 | 選擇 Electron + TypeScript
-- **決策**: 使用 Electron 作為桌面框架
-- **原因**: Claude Code 最擅長、與團隊技術棧一致（TypeScript）、跨平台潛力
-- **替代方案**: Tauri（更輕但生態新）、Swift 原生（學習成本高）、Python GUI（音訊生態好但 UI 弱）
-- **影響**: 打包體積較大（~150MB），但開發效率最高
+## ADR-001: Electron → Chrome Extension
 
-## 2026-02-18 | 音訊擷取使用 BlackHole
-- **決策**: 透過 BlackHole 虛擬音訊裝置擷取系統音訊
-- **原因**: 免費、穩定、不需要 Chrome 擴充套件、可擷取所有系統音訊
-- **替代方案**: macOS Screen Capture API（需額外權限）、Chrome Extension（綁定瀏覽器）
-- **影響**: 使用者需手動安裝 BlackHole，程式提供安裝引導
+**日期**: 2025-02-21
+**狀態**: Accepted
 
-## 2026-02-18 | 混合轉錄策略（本機 Whisper + 雲端 LLM）
-- **決策**: 語音轉錄用本機 Whisper，摘要生成用 Gemini API
-- **原因**: 轉錄資料量大適合本機處理（省費用）、摘要需要高品質 LLM
-- **替代方案**: 全雲端（貴）、全本機（摘要品質差）
-- **影響**: 需要下載 Whisper 模型（~500MB），首次啟動較慢
+**背景**: 原本計劃使用 Electron 桌面應用，但考量到開發速度和使用場景。
 
-## 2026-02-18 | 每 3-5 分鐘分段處理
-- **決策**: 音訊每 3-5 分鐘切一段，即時送轉錄
-- **原因**: 會議結束後 3-5 分鐘內就能產出紀錄，不用等整段處理
-- **替代方案**: 會後一次處理（等待時間長）
-- **影響**: 需要管理分段的上下文連續性、講者辨識跨段落一致性
+**決定**: 改用 Chrome Extension (Manifest V3)
 
-## 2026-02-18 | 輸出到 Google Docs + Email
-- **決策**: 主要輸出為 Google Docs，同時寄 Email 摘要
-- **原因**: Google Docs 方便團隊協作和搜尋、Email 作為即時通知
-- **替代方案**: Notion（API 限制多）、本機 Markdown（不方便分享）
-- **影響**: 需要 Google Cloud OAuth 設定
+**原因**:
+- 跨平台：Chrome 瀏覽器即可使用，無需安裝桌面應用
+- 開發速度：Extension 開發週期比 Electron 短
+- LINE Web 支援：Extension 可直接在瀏覽器頁面運作
+- 部署簡單：Chrome Web Store 一鍵安裝
+- tabCapture API：Chrome 原生支持分頁音訊擷取
+
+**取捨**: 失去系統音訊存取（只能錄分頁音訊），但會議場景以瀏覽器為主，影響不大。
+
+---
+
+## ADR-002: Whisper → Deepgram
+
+**日期**: 2025-02-21
+**狀態**: Accepted
+
+**背景**: 原本計劃使用 OpenAI Whisper，但評估後發現 Deepgram 更適合。
+
+**決定**: 使用 Deepgram Nova-2 作為語音轉錄引擎
+
+**原因**:
+- Speaker Diarization 內建：Whisper 需額外整合 pyannote
+- 中文品質：Nova-2 中文轉錄品質優異
+- 成本：$0.25/hr，比 Whisper API ($0.36/hr) 便宜
+- 即時性：支援 streaming（未來可做即時轉錄）
+- API 穩定：SLA 99.9%
+
+**取捨**: Deepgram 是第三方服務，有 vendor lock-in 風險。但成本和功能優勢明顯。
+
+---
+
+## ADR-003: Supabase 全家桶
+
+**日期**: 2025-02-21
+**狀態**: Accepted
+
+**背景**: 需要 Auth、Storage、Database、Serverless Functions。
+
+**決定**: 全部使用 Supabase 生態系
+
+**原因**:
+- 一站式：Auth + Storage + Edge Functions + PostgreSQL，不需拼裝
+- 開發速度：Supabase CLI 本地開發 + Migration 管理
+- 成本：Free tier 足夠 Phase 1
+- RLS：Row Level Security 內建，安全性有保障
+- 即時訂閱：Realtime 可用於狀態同步
+
+**取捨**: 與 Supabase 深度綁定。但 PostgreSQL 是開放標準，遷移成本可控。
+
+---
+
+## ADR-004: Gemini Flash for 摘要
+
+**日期**: 2025-02-21
+**狀態**: Accepted
+
+**背景**: 需要 AI 模型產出會議摘要。
+
+**決定**: 使用 Google Gemini 2.0 Flash
+
+**原因**:
+- 速度快：Flash 模型回應速度快
+- 中文佳：Google 中文訓練資料豐富
+- 成本低：比 GPT-4 便宜 10 倍以上
+- Structured output：支援 JSON schema 輸出
+- 長 context：100K+ tokens，長會議也能處理
+
+**取捨**: 摘要品質可能略遜於 GPT-4，但在會議摘要場景差異不大，且成本優勢明顯。
