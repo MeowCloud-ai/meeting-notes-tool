@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { SegmentUploader } from './upload';
+import { triggerTranscription } from './api';
 import type { RecordingStatus } from '../types/database';
 
 export interface RecordingSession {
@@ -83,6 +84,12 @@ export class RecordingManager {
     }
 
     this.session.status = 'uploading';
+
+    // Auto-trigger transcription after upload
+    const recordingId = this.session.recordingId;
+    triggerTranscription(recordingId).catch((err) => {
+      console.error('Auto-transcription failed:', err);
+    });
   }
 
   async failRecording(reason: string): Promise<void> {
