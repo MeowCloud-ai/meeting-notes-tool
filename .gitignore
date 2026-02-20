@@ -3,6 +3,8 @@ dist/
 out/
 .env
 .env.local
+.env.production
+supabase/.env
 *.wav
 *.mp3
 models/
