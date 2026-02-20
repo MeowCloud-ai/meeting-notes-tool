@@ -3,7 +3,7 @@
   "name": "MeowMeet",
   "version": "0.1.0",
   "description": "一鍵錄音，AI 自動產出會議摘要",
-  "permissions": ["tabCapture", "storage", "identity", "activeTab"],
+  "permissions": ["tabCapture", "storage", "identity", "activeTab", "offscreen"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
