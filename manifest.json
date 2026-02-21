@@ -2,8 +2,13 @@
   "manifest_version": 3,
   "name": "MeowMeet",
   "version": "0.1.0",
-  "description": "一鍵錄音，AI 自動產出會議摘要",
+  "description": "一鍵錄音，AI 自動產出會議摘要。Record meetings with one click, get AI-powered summaries automatically.",
   "permissions": ["tabCapture", "storage", "identity", "activeTab", "offscreen"],
+  "host_permissions": [],
+  "oauth2": {
+    "client_id": "",
+    "scopes": ["openid", "email", "profile"]
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -27,5 +32,6 @@
     "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
-  }
+  },
+  "offline_enabled": true
 }
