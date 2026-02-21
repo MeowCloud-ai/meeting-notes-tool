@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
 
     // Get profile
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
+      .from('meet_usage')
       .select('plan_type, monthly_recording_count, monthly_reset_at')
       .eq('id', user.id)
       .single();
@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     if (now >= resetAt) {
       const nextReset = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       await supabase
-        .from('profiles')
+        .from('meet_usage')
         .update({
           monthly_recording_count: 0,
           monthly_reset_at: nextReset.toISOString(),

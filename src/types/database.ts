@@ -73,7 +73,7 @@ export interface Summary {
 export interface Database {
   public: {
     Tables: {
-      profiles: {
+      meet_usage: {
         Row: Profile;
         Insert: Omit<Profile, 'created_at' | 'updated_at' | 'monthly_reset_at'> &
           Partial<Pick<Profile, 'created_at' | 'updated_at' | 'monthly_reset_at'>>;

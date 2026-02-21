@@ -45,14 +45,14 @@ export class PlanManager {
     // Fallback if RPC not available
     if (error) {
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('meet_usage')
         .select('monthly_recording_count')
         .eq('id', userId)
         .single();
 
       if (profile) {
         await supabase
-          .from('profiles')
+          .from('meet_usage')
           .update({
             monthly_recording_count: profile.monthly_recording_count + 1,
             updated_at: new Date().toISOString(),
@@ -66,7 +66,7 @@ export class PlanManager {
     await this.maybeResetMonthly(userId);
 
     const { data, error } = await supabase
-      .from('profiles')
+      .from('meet_usage')
       .select('plan_type, monthly_recording_count, monthly_reset_at')
       .eq('id', userId)
       .single();
@@ -86,7 +86,7 @@ export class PlanManager {
 
   private async maybeResetMonthly(userId: string): Promise<void> {
     const { data } = await supabase
-      .from('profiles')
+      .from('meet_usage')
       .select('monthly_reset_at')
       .eq('id', userId)
       .single();
@@ -101,7 +101,7 @@ export class PlanManager {
       const nextReset = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
       await supabase
-        .from('profiles')
+        .from('meet_usage')
         .update({
           monthly_recording_count: 0,
           monthly_reset_at: nextReset.toISOString(),
