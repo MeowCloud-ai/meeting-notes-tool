@@ -3,6 +3,9 @@ import { SegmentUploader } from './upload';
 import { triggerTranscription } from './api';
 import type { RecordingStatus } from '../types/database';
 
+export const MAX_RECORDING_DURATION_MS = 60 * 60 * 1000; // 60 minutes
+export const DURATION_WARNING_MS = 55 * 60 * 1000; // 55 minutes warning
+
 export interface RecordingSession {
   recordingId: string;
   segmentCount: number;
@@ -12,9 +15,44 @@ export interface RecordingSession {
 export class RecordingManager {
   private uploader: SegmentUploader;
   private session: RecordingSession | null = null;
+  private maxDurationTimer: ReturnType<typeof setTimeout> | null = null;
+  private warningTimer: ReturnType<typeof setTimeout> | null = null;
+  private onWarningCallback: (() => void) | null = null;
+  private onAutoStopCallback: (() => void) | null = null;
 
   constructor(userId: string) {
     this.uploader = new SegmentUploader(userId);
+  }
+
+  setOnWarning(callback: () => void): void {
+    this.onWarningCallback = callback;
+  }
+
+  setOnAutoStop(callback: () => void): void {
+    this.onAutoStopCallback = callback;
+  }
+
+  startDurationTimers(): void {
+    this.clearDurationTimers();
+
+    this.warningTimer = setTimeout(() => {
+      this.onWarningCallback?.();
+    }, DURATION_WARNING_MS);
+
+    this.maxDurationTimer = setTimeout(() => {
+      this.onAutoStopCallback?.();
+    }, MAX_RECORDING_DURATION_MS);
+  }
+
+  clearDurationTimers(): void {
+    if (this.warningTimer) {
+      clearTimeout(this.warningTimer);
+      this.warningTimer = null;
+    }
+    if (this.maxDurationTimer) {
+      clearTimeout(this.maxDurationTimer);
+      this.maxDurationTimer = null;
+    }
   }
 
   async createRecording(tabUrl: string | null, tabTitle: string | null): Promise<string> {
