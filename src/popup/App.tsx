@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import type { User } from '@supabase/supabase-js';
+import AuthGuard from './components/AuthGuard';
+import UserMenu from './components/UserMenu';
 import RecordButton from './components/RecordButton';
 import Timer from './components/Timer';
 import RecordingList from './components/RecordingList';
@@ -19,7 +22,7 @@ const INITIAL_STATE: AppState = {
   tabId: null,
 };
 
-export default function App() {
+function MainApp({ user }: { user: User }) {
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
@@ -53,6 +56,15 @@ export default function App() {
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      const { authManager } = await import('../lib/auth');
+      await authManager.signOut();
+    } catch (err) {
+      console.error('Sign out failed:', err);
+    }
+  };
+
   if (selectedRecording) {
     return (
       <div className="w-80 p-4" style={{ minHeight: '400px' }}>
@@ -67,6 +79,15 @@ export default function App() {
   return (
     <div className="w-80 p-4 flex flex-col gap-4">
       <h1 className="text-xl font-bold text-center">🐱 MeowMeet</h1>
+
+      <UserMenu
+        displayName={user.user_metadata?.['full_name'] as string | null ?? null}
+        email={user.email ?? ''}
+        avatarUrl={user.user_metadata?.['avatar_url'] as string | null}
+        usageUsed={0}
+        usageLimit={3}
+        onSignOut={handleSignOut}
+      />
 
       <Timer isRunning={state.isRecording && !state.isPaused} startTime={state.startTime} />
 
@@ -84,5 +105,13 @@ export default function App() {
 
       <RecordingList onSelectRecording={setSelectedRecording} />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthGuard>
+      {(user) => <MainApp user={user} />}
+    </AuthGuard>
   );
 }
