@@ -49,12 +49,19 @@ export class AuthManager {
     const redirectUri = chrome.identity.getRedirectURL();
     const nonce = crypto.randomUUID();
     
+    // Google gets the hashed nonce, Supabase gets the raw nonce
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(nonce));
+    const hashedNonce = Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('response_type', 'id_token');
     authUrl.searchParams.set('scope', 'openid email profile');
-    authUrl.searchParams.set('nonce', nonce);
+    authUrl.searchParams.set('nonce', hashedNonce);
     authUrl.searchParams.set('prompt', 'select_account');
 
     const responseUrl = await chrome.identity.launchWebAuthFlow({
