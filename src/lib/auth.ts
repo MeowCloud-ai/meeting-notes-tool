@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import type { Session, User } from '@supabase/supabase-js';
 
+const GOOGLE_CLIENT_ID = '236935341601-36b75g06ctnn50760tan6qvm4o2v65ln.apps.googleusercontent.com';
+
 export class AuthManager {
   private listeners: Set<(user: User | null) => void> = new Set();
 
@@ -12,10 +14,10 @@ export class AuthManager {
   }
 
   async signIn(): Promise<User> {
-    const token = await this.getGoogleToken();
+    const idToken = await this.getGoogleIdToken();
     const { data, error } = await supabase.auth.signInWithIdToken({
       provider: 'google',
-      token,
+      token: idToken,
     });
 
     if (error || !data.user) {
@@ -28,16 +30,6 @@ export class AuthManager {
   async signOut(): Promise<void> {
     const { error } = await supabase.auth.signOut();
     if (error) throw new Error(error.message);
-
-    // Also revoke the Chrome identity token
-    try {
-      const token = await this.getCachedToken();
-      if (token) {
-        chrome.identity.removeCachedAuthToken({ token });
-      }
-    } catch {
-      // Best effort
-    }
   }
 
   async getSession(): Promise<Session | null> {
@@ -52,21 +44,38 @@ export class AuthManager {
     };
   }
 
-  private async getGoogleToken(): Promise<string> {
-    const result = await chrome.identity.getAuthToken({ interactive: true });
-    if (!result.token) {
-      throw new Error('Failed to get auth token');
-    }
-    return result.token;
-  }
+  private async getGoogleIdToken(): Promise<string> {
+    const redirectUri = chrome.identity.getRedirectURL();
+    const nonce = crypto.randomUUID();
+    
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'id_token');
+    authUrl.searchParams.set('scope', 'openid email profile');
+    authUrl.searchParams.set('nonce', nonce);
+    authUrl.searchParams.set('prompt', 'select_account');
 
-  private async getCachedToken(): Promise<string | null> {
-    try {
-      const result = await chrome.identity.getAuthToken({ interactive: false });
-      return result.token ?? null;
-    } catch {
-      return null;
+    const responseUrl = await chrome.identity.launchWebAuthFlow({
+      url: authUrl.toString(),
+      interactive: true,
+    });
+
+    if (!responseUrl) {
+      throw new Error('Auth flow cancelled');
     }
+
+    // Extract id_token from URL fragment
+    const hashParams = new URLSearchParams(
+      new URL(responseUrl).hash.substring(1)
+    );
+    const idToken = hashParams.get('id_token');
+    
+    if (!idToken) {
+      throw new Error('No ID token in response');
+    }
+
+    return idToken;
   }
 }
 

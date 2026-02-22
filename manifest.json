@@ -6,7 +6,7 @@
   "permissions": ["tabCapture", "storage", "identity", "activeTab", "offscreen"],
   "host_permissions": [],
   "oauth2": {
-    "client_id": "",
+    "client_id": "236935341601-36b75g06ctnn50760tan6qvm4o2v65ln.apps.googleusercontent.com",
     "scopes": ["openid", "email", "profile"]
   },
   "action": {
