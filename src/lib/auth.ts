@@ -14,10 +14,11 @@ export class AuthManager {
   }
 
   async signIn(): Promise<User> {
-    const idToken = await this.getGoogleIdToken();
+    const { idToken, nonce } = await this.getGoogleIdToken();
     const { data, error } = await supabase.auth.signInWithIdToken({
       provider: 'google',
       token: idToken,
+      nonce,
     });
 
     if (error || !data.user) {
@@ -44,7 +45,7 @@ export class AuthManager {
     };
   }
 
-  private async getGoogleIdToken(): Promise<string> {
+  private async getGoogleIdToken(): Promise<{ idToken: string; nonce: string }> {
     const redirectUri = chrome.identity.getRedirectURL();
     const nonce = crypto.randomUUID();
     
@@ -75,7 +76,7 @@ export class AuthManager {
       throw new Error('No ID token in response');
     }
 
-    return idToken;
+    return { idToken, nonce };
   }
 }
 
