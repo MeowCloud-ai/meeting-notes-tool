@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type { Session, User } from '@supabase/supabase-js';
 
-const GOOGLE_CLIENT_ID = '236935341601-36b75g06ctnn50760tan6qvm4o2v65ln.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '236935341601-390v5reo5vujuscaoje6n76rabrshl01.apps.googleusercontent.com';
 
 export class AuthManager {
   private listeners: Set<(user: User | null) => void> = new Set();
