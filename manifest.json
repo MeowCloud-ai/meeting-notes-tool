@@ -1,5 +1,6 @@
 {
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy82+ZP/tI5GfnYu7Bungjk1VE6DWcuX8u+UjSP67mIqVqpNTHpERQVDhLzZPhUuQ9FWJ8reoJFrbCfmL6g2FJiouLyr85nBEgKmDva4QFKEeTnjHi3rpljz7hmissR/TEzIYhQu0xUhmCrOWu8JAqAlmKGgpKPDc5MmURkfVHanZV5HcyFoeg521FH6Y1OYesh0693aKuZ4zwfr8LlyxW5WD7+mm7H8JcwVkb0uSfZoxWFpaRAPuYnXSIIsCtSCxe55owvcyIb6j7y5s8RVLyY8dPgU1WXsn+UPZge74D5mL7s6AXvNuMUgpWFSMaGIdbGDyrgrDni9sX3cmO1VslQIDAQAB",
   "name": "MeowMeet",
   "version": "0.1.0",
   "description": "一鍵錄音，AI 自動產出會議摘要。Record meetings with one click, get AI-powered summaries automatically.",
