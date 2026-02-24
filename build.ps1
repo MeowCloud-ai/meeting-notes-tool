@@ -14,6 +14,6 @@ if (Test-Path icons) { Copy-Item icons dist\icons -Recurse -Force }
 $manifest = Get-Content manifest.json -Raw | ConvertFrom-Json
 $manifest.background.service_worker = "background.js"
 $manifest.content_scripts[0].js = @("content.js")
-$manifest | ConvertTo-Json -Depth 10 | Set-Content dist\manifest.json -Encoding UTF8
+$manifest | ConvertTo-Json -Depth 10 | Out-File dist\manifest.json -Encoding utf8NoBOM
 
 Write-Host "Done! Load dist/ folder in chrome://extensions/" -ForegroundColor Green
