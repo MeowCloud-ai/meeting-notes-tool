@@ -61,10 +61,14 @@ export class TabRecorder {
   async pauseRecording(): Promise<void> {
     if (!this.state.isRecording || this.state.isPaused) return;
 
-    await chrome.runtime.sendMessage({
+    const response = (await chrome.runtime.sendMessage({
       type: 'OFFSCREEN_PAUSE_RECORDING',
       target: 'offscreen',
-    });
+    })) as { success: boolean; error?: string };
+
+    if (!response.success) {
+      throw new Error(response.error ?? 'Failed to pause recording');
+    }
 
     this.state.isPaused = true;
     await this.updateBadge();
@@ -73,10 +77,14 @@ export class TabRecorder {
   async resumeRecording(): Promise<void> {
     if (!this.state.isRecording || !this.state.isPaused) return;
 
-    await chrome.runtime.sendMessage({
+    const response = (await chrome.runtime.sendMessage({
       type: 'OFFSCREEN_RESUME_RECORDING',
       target: 'offscreen',
-    });
+    })) as { success: boolean; error?: string };
+
+    if (!response.success) {
+      throw new Error(response.error ?? 'Failed to resume recording');
+    }
 
     this.state.isPaused = false;
     await this.updateBadge();

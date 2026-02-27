@@ -150,6 +150,19 @@ describe('TabRecorder', () => {
       await recorder.pauseRecording();
       expect(mockChrome.runtime.sendMessage).not.toHaveBeenCalled();
     });
+
+    it('throws if offscreen reports failure', async () => {
+      mockChrome.runtime.sendMessage.mockImplementation(
+        (msg: { type: string }) => {
+          if (msg.type === 'OFFSCREEN_PAUSE_RECORDING') {
+            return Promise.resolve({ success: false, error: 'Cannot pause: recorder state is inactive' });
+          }
+          return Promise.resolve({ success: true, micEnabled: true });
+        },
+      );
+      await recorder.startRecording(1);
+      await expect(recorder.pauseRecording()).rejects.toThrow('Cannot pause');
+    });
   });
 
   describe('resumeRecording', () => {
@@ -167,6 +180,16 @@ describe('TabRecorder', () => {
       vi.clearAllMocks();
       await recorder.resumeRecording();
       expect(mockChrome.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('throws if stream ended during pause', async () => {
+      await recorder.startRecording(1);
+      await recorder.pauseRecording();
+      mockChrome.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        error: 'Tab audio stream ended during pause',
+      });
+      await expect(recorder.resumeRecording()).rejects.toThrow('Tab audio stream ended');
     });
   });
 
