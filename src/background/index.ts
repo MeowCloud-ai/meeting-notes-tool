@@ -5,8 +5,7 @@ import { supabase } from '../lib/supabase';
 const recorder = new TabRecorder();
 let recordingManager: RecordingManager | null = null;
 
-// Store processing status so popup can read it
-async function setProcessingStatus(status: string | null) {
+async function setProcessingStatus(status: string | null): Promise<void> {
   await chrome.storage.local.set({
     meowmeet_processing: status,
     ...(status && status.startsWith('錯誤') ? { meowmeet_last_error: status } : {}),
@@ -18,7 +17,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   switch (message.type) {
     case 'START_RECORDING': {
-      chrome.tabs.query({ active: true, currentWindow: true })
+      chrome.tabs
+        .query({ active: true, currentWindow: true })
         .then(async (tabs) => {
           const tab = tabs[0];
           const tabId = tab?.id;
@@ -27,9 +27,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             return;
           }
 
-          const { data: { user } } = await supabase.auth.getUser();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
           if (!user) {
-            sendResponse({ success: false, error: 'Not authenticated — please sign out and sign in again' });
+            sendResponse({
+              success: false,
+              error: 'Not authenticated — please sign out and sign in again',
+            });
             return;
           }
 
@@ -68,24 +73,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const startTime = state.startTime ?? Date.now();
       const durationSeconds = Math.round((Date.now() - startTime) / 1000);
 
-      // Respond immediately so popup doesn't hang
       setProcessingStatus('正在停止錄音...').catch(() => {});
 
       recorder
         .stopRecording()
-        .then(async (audioBlob) => {
-          console.log('Recording stopped, blob size:', audioBlob.size);
+        .then(async () => {
+          console.log('Recording stopped');
           sendResponse({ success: true, state: recorder.getState() });
 
-          // Upload and transcribe in background (after responding to popup)
           if (recordingManager) {
             try {
-              await setProcessingStatus('上傳音檔中...');
-              await recordingManager.handleSegment(audioBlob);
-              await setProcessingStatus('轉錄中...');
+              await setProcessingStatus('等待轉錄完成...');
               await recordingManager.completeRecording(durationSeconds);
               await setProcessingStatus('完成！');
-              console.log('Recording completed and transcription triggered');
+              console.log('Recording completed and stitch triggered');
             } catch (uploadErr) {
               console.error('Upload/transcription failed:', uploadErr);
               const errMsg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
@@ -95,7 +96,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             } finally {
               recordingManager.clearDurationTimers();
               recordingManager = null;
-              // Keep error visible for 60s
               setTimeout(() => setProcessingStatus(null), 60000);
             }
           }
@@ -112,15 +112,51 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return true;
     }
 
-    case 'GET_STATE': {
-      chrome.storage.local.get(['meowmeet_processing', 'meowmeet_last_error']).then((result) => {
-        sendResponse({
-          success: true,
-          state: recorder.getState(),
-          processing: (result.meowmeet_processing as string) ?? null,
-          lastError: (result.meowmeet_last_error as string) ?? null,
-        });
+    /**
+     * Handle segment data from offscreen document.
+     * Each segment is uploaded and transcription is triggered immediately.
+     */
+    case 'SEGMENT_READY': {
+      const { segmentIndex, audioBase64, mimeType } = message as {
+        segmentIndex: number;
+        audioBase64: string;
+        mimeType: string;
+      };
+
+      if (!recordingManager) {
+        console.warn('SEGMENT_READY received but no active recording manager');
+        return false;
+      }
+
+      // Decode base64 to Blob
+      const binary = atob(audioBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mimeType });
+
+      console.log(`Segment ${segmentIndex} received, size: ${blob.size}`);
+      setProcessingStatus(`上傳分段 ${segmentIndex + 1}...`).catch(() => {});
+
+      recordingManager.handleSegment(blob).catch((err) => {
+        console.error(`Failed to handle segment ${segmentIndex}:`, err);
       });
+
+      return false;
+    }
+
+    case 'GET_STATE': {
+      chrome.storage.local
+        .get(['meowmeet_processing', 'meowmeet_last_error'])
+        .then((result) => {
+          sendResponse({
+            success: true,
+            state: recorder.getState(),
+            processing: (result.meowmeet_processing as string) ?? null,
+            lastError: (result.meowmeet_last_error as string) ?? null,
+          });
+        });
       return true;
     }
 

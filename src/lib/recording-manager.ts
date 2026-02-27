@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { SegmentUploader } from './upload';
-import { triggerTranscription } from './api';
+import { triggerSegmentTranscription, triggerStitchTranscripts } from './api';
 import type { RecordingStatus } from '../types/database';
 
 export const MAX_RECORDING_DURATION_MS = 60 * 60 * 1000; // 60 minutes
@@ -19,8 +19,10 @@ export class RecordingManager {
   private warningTimer: ReturnType<typeof setTimeout> | null = null;
   private onWarningCallback: (() => void) | null = null;
   private onAutoStopCallback: (() => void) | null = null;
+  private userId: string;
 
   constructor(userId: string) {
+    this.userId = userId;
     this.uploader = new SegmentUploader(userId);
   }
 
@@ -59,7 +61,7 @@ export class RecordingManager {
     const { data, error } = await supabase
       .from('recordings')
       .insert({
-        user_id: (await supabase.auth.getUser()).data.user?.id ?? '',
+        user_id: this.userId,
         title: tabTitle ?? 'Untitled Recording',
         status: 'recording' as RecordingStatus,
         segment_count: 0,
@@ -84,22 +86,54 @@ export class RecordingManager {
     return data.id;
   }
 
+  /**
+   * Handle a segment that arrives during recording.
+   * Uploads to storage, creates a recording_segments row, and triggers per-segment transcription.
+   */
   async handleSegment(blob: Blob): Promise<void> {
     if (!this.session) throw new Error('No active session');
 
     const index = this.session.segmentCount;
     this.session.segmentCount++;
 
+    const storagePath = `${this.userId}/${this.session.recordingId}/segment_${index}.webm`;
+
+    // Insert segment row
+    await supabase.from('recording_segments').insert({
+      recording_id: this.session.recordingId,
+      segment_index: index,
+      storage_path: storagePath,
+      status: 'uploading',
+    });
+
     try {
       await this.uploader.uploadSegment(this.session.recordingId, index, blob);
-    } catch {
-      // Segment was cached in IndexedDB by uploader
-    }
 
-    await supabase
-      .from('recordings')
-      .update({ segment_count: this.session.segmentCount })
-      .eq('id', this.session.recordingId);
+      // Mark uploaded
+      await supabase
+        .from('recording_segments')
+        .update({ status: 'uploaded' })
+        .eq('recording_id', this.session.recordingId)
+        .eq('segment_index', index);
+
+      // Update recording segment count
+      await supabase
+        .from('recordings')
+        .update({ segment_count: this.session.segmentCount })
+        .eq('id', this.session.recordingId);
+
+      // Trigger per-segment transcription in background (fire and forget)
+      triggerSegmentTranscription(this.session.recordingId, index).catch((err) =>
+        console.error(`Segment ${index} transcription trigger failed:`, err),
+      );
+    } catch {
+      // Upload failed — segment is cached in IndexedDB for retry
+      await supabase
+        .from('recording_segments')
+        .update({ status: 'failed' })
+        .eq('recording_id', this.session.recordingId)
+        .eq('segment_index', index);
+    }
   }
 
   async completeRecording(durationSeconds: number): Promise<void> {
@@ -123,10 +157,10 @@ export class RecordingManager {
 
     this.session.status = 'uploading';
 
-    // Auto-trigger transcription after upload
+    // Trigger final stitch — this waits for all segments to be transcribed, then merges
     const recordingId = this.session.recordingId;
-    triggerTranscription(recordingId).catch((err) => {
-      console.error('Auto-transcription failed:', err);
+    triggerStitchTranscripts(recordingId).catch((err) => {
+      console.error('Stitch transcripts failed:', err);
     });
   }
 

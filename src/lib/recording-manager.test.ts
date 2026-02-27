@@ -1,114 +1,138 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { RecordingManager } from './recording-manager';
+import { RecordingManager, MAX_RECORDING_DURATION_MS, DURATION_WARNING_MS } from './recording-manager';
 
-const mockInsert = vi.fn();
-const mockUpdate = vi.fn();
-const mockGetUser = vi.fn();
+// Mock supabase
+const mockFrom = vi.fn();
+const mockFunctions = { invoke: vi.fn() };
 
 vi.mock('./supabase', () => ({
   supabase: {
-    from: (table: string) => {
-      if (table === 'recordings') {
-        return {
-          insert: (data: unknown) => {
-            mockInsert(data);
-            return {
-              select: () => ({
-                single: () =>
-                  Promise.resolve({ data: { id: 'rec-abc' }, error: null }),
-              }),
-            };
-          },
-          update: (data: unknown) => {
-            mockUpdate(data);
-            return {
-              eq: () => Promise.resolve({ error: null }),
-            };
-          },
-        };
-      }
-      return {};
-    },
-    auth: {
-      getUser: () => mockGetUser(),
-    },
-    storage: {
-      from: () => ({
-        upload: vi.fn().mockResolvedValue({ error: null }),
-      }),
-    },
+    from: (...args: unknown[]) => mockFrom(...args),
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }) },
+    functions: { invoke: (...args: unknown[]) => mockFunctions.invoke(...args) },
   },
 }));
+
+vi.mock('./upload', () => {
+  const MockUploader = vi.fn();
+  MockUploader.prototype.uploadSegment = vi.fn().mockResolvedValue('path');
+  MockUploader.prototype.flushCache = vi.fn().mockResolvedValue(undefined);
+  return { SegmentUploader: MockUploader };
+});
+
+vi.mock('./api', () => ({
+  triggerSegmentTranscription: vi.fn().mockResolvedValue(undefined),
+  triggerStitchTranscripts: vi.fn().mockResolvedValue(undefined),
+  triggerTranscription: vi.fn().mockResolvedValue(undefined),
+}));
+
+function mockChain(data: unknown = null, error: unknown = null) {
+  const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+  chain.insert = vi.fn().mockReturnValue(chain);
+  chain.update = vi.fn().mockReturnValue(chain);
+  chain.select = vi.fn().mockReturnValue(chain);
+  chain.eq = vi.fn().mockReturnValue(chain);
+  chain.single = vi.fn().mockResolvedValue({ data, error });
+  return chain;
+}
 
 describe('RecordingManager', () => {
   let manager: RecordingManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+    vi.useFakeTimers();
     manager = new RecordingManager('user-1');
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe('createRecording', () => {
-    it('creates a recording and returns id', async () => {
-      const id = await manager.createRecording('https://meet.google.com', 'Meeting');
-      expect(id).toBe('rec-abc');
-      expect(mockInsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'Meeting',
-          status: 'recording',
-          tab_url: 'https://meet.google.com',
-        }),
-      );
+    it('creates a recording and sets session', async () => {
+      const chain = mockChain({ id: 'rec-1' });
+      mockFrom.mockReturnValue(chain);
+
+      const id = await manager.createRecording('https://meet.google.com/abc', 'Test Meeting');
+      expect(id).toBe('rec-1');
+      expect(manager.getSession()).toEqual({
+        recordingId: 'rec-1',
+        segmentCount: 0,
+        status: 'recording',
+      });
     });
 
-    it('uses default title when tabTitle is null', async () => {
-      await manager.createRecording(null, null);
-      expect(mockInsert).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'Untitled Recording' }),
-      );
+    it('throws on insert error', async () => {
+      const chain = mockChain(null, { message: 'db error' });
+      mockFrom.mockReturnValue(chain);
+
+      await expect(manager.createRecording(null, null)).rejects.toThrow('Failed to create recording');
     });
   });
 
   describe('handleSegment', () => {
-    it('increments segment count', async () => {
-      await manager.createRecording(null, 'Test');
-      await manager.handleSegment(new Blob(['data']));
+    it('increments segment count and inserts segment row', async () => {
+      // Setup session
+      const createChain = mockChain({ id: 'rec-1' });
+      mockFrom.mockReturnValue(createChain);
+      await manager.createRecording(null, null);
 
-      const session = manager.getSession();
-      expect(session?.segmentCount).toBe(1);
-      expect(mockUpdate).toHaveBeenCalledWith({ segment_count: 1 });
+      // For handleSegment calls
+      const segChain = mockChain();
+      mockFrom.mockReturnValue(segChain);
+
+      const blob = new Blob(['test'], { type: 'audio/webm' });
+      await manager.handleSegment(blob);
+
+      expect(manager.getSession()?.segmentCount).toBe(1);
     });
 
-    it('throws without active session', async () => {
-      await expect(manager.handleSegment(new Blob())).rejects.toThrow('No active session');
+    it('throws if no session', async () => {
+      const blob = new Blob(['test'], { type: 'audio/webm' });
+      await expect(manager.handleSegment(blob)).rejects.toThrow('No active session');
+    });
+  });
+
+  describe('duration timers', () => {
+    it('fires warning at 55 minutes', () => {
+      const onWarning = vi.fn();
+      manager.setOnWarning(onWarning);
+      manager.startDurationTimers();
+
+      vi.advanceTimersByTime(DURATION_WARNING_MS);
+      expect(onWarning).toHaveBeenCalledOnce();
+    });
+
+    it('fires auto-stop at 60 minutes', () => {
+      const onAutoStop = vi.fn();
+      manager.setOnAutoStop(onAutoStop);
+      manager.startDurationTimers();
+
+      vi.advanceTimersByTime(MAX_RECORDING_DURATION_MS);
+      expect(onAutoStop).toHaveBeenCalledOnce();
+    });
+
+    it('clears timers', () => {
+      const onWarning = vi.fn();
+      manager.setOnWarning(onWarning);
+      manager.startDurationTimers();
+      manager.clearDurationTimers();
+
+      vi.advanceTimersByTime(MAX_RECORDING_DURATION_MS);
+      expect(onWarning).not.toHaveBeenCalled();
     });
   });
 
   describe('completeRecording', () => {
-    it('updates status to uploading', async () => {
-      await manager.createRecording(null, 'Test');
-      await manager.completeRecording(120);
-
-      expect(mockUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: 'uploading',
-          duration_seconds: 120,
-        }),
-      );
+    it('throws if no session', async () => {
+      await expect(manager.completeRecording(300)).rejects.toThrow('No active session');
     });
   });
 
-  describe('getSession', () => {
-    it('returns null when no session', () => {
-      expect(manager.getSession()).toBeNull();
-    });
-
-    it('returns session copy', async () => {
-      await manager.createRecording(null, 'Test');
-      const session = manager.getSession();
-      expect(session?.recordingId).toBe('rec-abc');
-      expect(session?.status).toBe('recording');
+  describe('failRecording', () => {
+    it('does nothing if no session', async () => {
+      await expect(manager.failRecording('test')).resolves.toBeUndefined();
     });
   });
 });

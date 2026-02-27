@@ -1,87 +1,112 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { triggerTranscription, triggerSummarization, getTranscript, getSummary } from './api';
+import {
+  triggerSegmentTranscription,
+  triggerStitchTranscripts,
+  triggerTranscription,
+  triggerSummarization,
+  getTranscript,
+  getSummary,
+} from './api';
 
-// Mock supabase
 const mockInvoke = vi.fn();
-const mockSelect = vi.fn();
-const mockEq = vi.fn();
-const mockSingle = vi.fn();
+const mockFrom = vi.fn();
 
 vi.mock('./supabase', () => ({
   supabase: {
-    functions: {
-      invoke: (...args: unknown[]) => mockInvoke(...args),
-    },
-    from: () => ({
-      select: (...args: unknown[]) => {
-        mockSelect(...args);
-        return {
-          eq: (...eqArgs: unknown[]) => {
-            mockEq(...eqArgs);
-            return { single: () => mockSingle() };
-          },
-        };
-      },
-    }),
+    functions: { invoke: (...args: unknown[]) => mockInvoke(...args) },
+    from: (...args: unknown[]) => mockFrom(...args),
   },
 }));
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
-describe('triggerTranscription', () => {
-  it('calls transcribe edge function', async () => {
-    mockInvoke.mockResolvedValue({ data: {}, error: null });
-    await triggerTranscription('rec-123');
-    expect(mockInvoke).toHaveBeenCalledWith('transcribe', { body: { recordingId: 'rec-123' } });
+describe('API', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('throws on error', async () => {
-    mockInvoke.mockResolvedValue({ data: null, error: { message: 'fail' } });
-    await expect(triggerTranscription('rec-123')).rejects.toThrow('Transcription failed');
-  });
-});
+  describe('triggerSegmentTranscription', () => {
+    it('invokes transcribe with segment mode', async () => {
+      mockInvoke.mockResolvedValue({ error: null });
+      await triggerSegmentTranscription('rec-1', 0);
+      expect(mockInvoke).toHaveBeenCalledWith('transcribe', {
+        body: { recordingId: 'rec-1', segmentIndex: 0, mode: 'segment' },
+      });
+    });
 
-describe('triggerSummarization', () => {
-  it('calls summarize edge function', async () => {
-    mockInvoke.mockResolvedValue({ data: {}, error: null });
-    await triggerSummarization('rec-123');
-    expect(mockInvoke).toHaveBeenCalledWith('summarize', { body: { recordingId: 'rec-123' } });
-  });
-
-  it('throws on error', async () => {
-    mockInvoke.mockResolvedValue({ data: null, error: { message: 'fail' } });
-    await expect(triggerSummarization('rec-123')).rejects.toThrow('Summarization failed');
-  });
-});
-
-describe('getTranscript', () => {
-  it('returns transcript data', async () => {
-    const transcript = { id: 't1', recording_id: 'rec-123', content: 'hello' };
-    mockSingle.mockResolvedValue({ data: transcript, error: null });
-    const result = await getTranscript('rec-123');
-    expect(result).toEqual(transcript);
+    it('throws on error', async () => {
+      mockInvoke.mockResolvedValue({ error: { message: 'fail' } });
+      await expect(triggerSegmentTranscription('rec-1', 0)).rejects.toThrow(
+        'Segment transcription failed',
+      );
+    });
   });
 
-  it('returns null on error', async () => {
-    mockSingle.mockResolvedValue({ data: null, error: { message: 'not found' } });
-    const result = await getTranscript('rec-999');
-    expect(result).toBeNull();
-  });
-});
-
-describe('getSummary', () => {
-  it('returns summary data', async () => {
-    const summary = { id: 's1', recording_id: 'rec-123', raw_summary: 'test' };
-    mockSingle.mockResolvedValue({ data: summary, error: null });
-    const result = await getSummary('rec-123');
-    expect(result).toEqual(summary);
+  describe('triggerStitchTranscripts', () => {
+    it('invokes transcribe with stitch mode', async () => {
+      mockInvoke.mockResolvedValue({ error: null });
+      await triggerStitchTranscripts('rec-1');
+      expect(mockInvoke).toHaveBeenCalledWith('transcribe', {
+        body: { recordingId: 'rec-1', mode: 'stitch' },
+      });
+    });
   });
 
-  it('returns null on error', async () => {
-    mockSingle.mockResolvedValue({ data: null, error: { message: 'not found' } });
-    const result = await getSummary('rec-999');
-    expect(result).toBeNull();
+  describe('triggerTranscription (legacy)', () => {
+    it('invokes transcribe without mode', async () => {
+      mockInvoke.mockResolvedValue({ error: null });
+      await triggerTranscription('rec-1');
+      expect(mockInvoke).toHaveBeenCalledWith('transcribe', {
+        body: { recordingId: 'rec-1' },
+      });
+    });
+  });
+
+  describe('triggerSummarization', () => {
+    it('invokes summarize', async () => {
+      mockInvoke.mockResolvedValue({ error: null });
+      await triggerSummarization('rec-1');
+      expect(mockInvoke).toHaveBeenCalledWith('summarize', {
+        body: { recordingId: 'rec-1' },
+      });
+    });
+  });
+
+  describe('getTranscript', () => {
+    it('returns transcript data', async () => {
+      const chain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: { id: 't-1' }, error: null }),
+      };
+      mockFrom.mockReturnValue(chain);
+
+      const result = await getTranscript('rec-1');
+      expect(result).toEqual({ id: 't-1' });
+    });
+
+    it('returns null on error', async () => {
+      const chain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: null, error: { message: 'not found' } }),
+      };
+      mockFrom.mockReturnValue(chain);
+
+      const result = await getTranscript('rec-1');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getSummary', () => {
+    it('returns null on error', async () => {
+      const chain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: null, error: { message: 'not found' } }),
+      };
+      mockFrom.mockReturnValue(chain);
+
+      const result = await getSummary('rec-1');
+      expect(result).toBeNull();
+    });
   });
 });
