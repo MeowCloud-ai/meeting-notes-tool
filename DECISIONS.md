@@ -77,3 +77,22 @@
 - 長 context：100K+ tokens，長會議也能處理
 
 **取捨**: 摘要品質可能略遜於 GPT-4，但在會議摘要場景差異不大，且成本優勢明顯。
+
+## ADR-005: 分段批次轉錄（非即時串流）
+- **日期**: 2026-02-27
+- **決策**: 採用每 3 分鐘切段 + 批次上傳轉錄，不做 YouTube 式 Streaming ASR
+- **原因**: 不需即時字幕/即時建議，批次更簡單、便宜、準確度高
+- **參數**: 3 分鐘為起始值，後續實測可往下壓（甜蜜點可能 1.5-2 分鐘）
+- **影響**: 錄完 ≤30 秒出完整結果
+
+## ADR-006: 麥克風 + Tab 混音
+- **日期**: 2026-02-27
+- **決策**: 用 AudioContext 混合 tabCapture（對方聲音）+ getUserMedia（本地麥克風）
+- **原因**: tabCapture 只錄分頁輸出，不含使用者自己的聲音
+- **Fallback**: 麥克風權限被拒時只錄 tab 音訊，不阻斷流程
+
+## ADR-007: Build Pipeline — post-build.sh
+- **日期**: 2026-02-27
+- **決策**: 加入 post-build.sh 腳本修正 dist/manifest.json 路徑
+- **原因**: Vite build 不自動處理 manifest.json，src 路徑需改為 build 後的 .js 檔名
+- **影響**: `npm run build` 後必須跑 `bash scripts/post-build.sh`

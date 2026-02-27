@@ -196,3 +196,82 @@
   - [ ] CI 整合
   - [ ] 覆蓋率報告
 - **驗收**: CI 自動執行 E2E 測試，全部通過
+
+---
+
+## Sprint 4（Alpha 強化）— 預計 1 週
+
+### Task 15: 麥克風混音
+- **Issue**: #51
+- **Branch**: `feat/task-15-mic-mixing`
+- **依賴**: Task 4
+- **子任務**:
+  - [ ] getUserMedia 取得麥克風 stream
+  - [ ] AudioContext + MediaStreamDestination 混合 tab + mic
+  - [ ] 混合後 stream 給 MediaRecorder
+  - [ ] 麥克風權限拒絕時 fallback 只錄 tab
+  - [ ] UI 顯示麥克風狀態
+  - [ ] 音量平衡調整
+  - [ ] 單元測試
+- **驗收**: 錄音包含雙方聲音，Deepgram 能辨識講者
+
+### Task 16: 修復暫停功能
+- **Issue**: #49
+- **Branch**: `fix/task-16-pause-recording`
+- **依賴**: Task 4
+- **子任務**:
+  - [ ] 調查 MediaRecorder.pause() 在 offscreen 的行為
+  - [ ] 確認 tabCapture stream 暫停時不斷開
+  - [ ] 修復狀態同步（background ↔ popup）
+  - [ ] 單元測試
+- **驗收**: 暫停/繼續正常運作，計時器同步
+
+### Task 17: SSO 前端對接
+- **Issue**: #44
+- **Branch**: `feat/task-17-sso-ensure-org`
+- **依賴**: Task 11, ensure-org Edge Function
+- **子任務**:
+  - [ ] 登入成功後自動呼叫 ensure-org
+  - [ ] 首位登入者自動建組織 + 成為 Admin
+  - [ ] UI 顯示組織名稱
+  - [ ] 錯誤處理（org 建立失敗）
+  - [ ] 單元測試
+- **驗收**: 新用戶登入自動建組織，再次登入自動加入
+
+### Task 18: RLS 安全驗證
+- **Issue**: #47
+- **Branch**: `feat/task-18-rls-verification`
+- **依賴**: Task 2
+- **子任務**:
+  - [ ] 撰寫 RLS 測試（跨用戶存取被拒）
+  - [ ] 撰寫 RLS 測試（同組織可互看錄音）
+  - [ ] 撰寫 RLS 測試（storage bucket 權限）
+  - [ ] CI 整合 RLS 測試
+- **驗收**: 所有 RLS 測試通過，跨用戶存取被正確擋住
+
+### Task 19: 分段錄音 + 批次轉錄
+- **Issue**: #48
+- **Branch**: `feat/task-19-segment-recording`
+- **依賴**: Task 4, Task 8
+- **子任務**:
+  - [ ] 錄音時每 3 分鐘自動切段
+  - [ ] 切段後背景上傳 Supabase Storage
+  - [ ] 上傳完觸發 transcribe Edge Function
+  - [ ] 後端按 segment_index 拼接逐字稿
+  - [ ] 講者辨識跨段落銜接
+  - [ ] recording_segments 表（如需要）
+  - [ ] 網路中斷自動重試
+  - [ ] 單元測試 + 整合測試
+- **驗收**: 30 分鐘會議錄完 ≤30 秒出完整結果
+
+### Task 20: 錄音列表標題改善
+- **Issue**: #50
+- **Branch**: `feat/task-20-recording-titles`
+- **依賴**: Task 6
+- **子任務**:
+  - [ ] Google Meet → 提取會議名稱
+  - [ ] LINE → 顯示「LINE 通話」
+  - [ ] 其他 → 日期時間格式
+  - [ ] 使用者可編輯標題
+  - [ ] 列表預覽摘要重點
+- **驗收**: 列表顯示有意義的標題
