@@ -3,8 +3,15 @@ import type { Session, User } from '@supabase/supabase-js';
 
 const GOOGLE_CLIENT_ID = '236935341601-pblbq373pkuo8mk7ibai10u1lcqi5gfc.apps.googleusercontent.com';
 
+export interface OrgInfo {
+  orgId: string;
+  orgName: string;
+  role: string;
+}
+
 export class AuthManager {
   private listeners: Set<(user: User | null) => void> = new Set();
+  private orgInfo: OrgInfo | null = null;
 
   constructor() {
     supabase.auth.onAuthStateChange((_event, session) => {
@@ -26,12 +33,7 @@ export class AuthManager {
     }
 
     // Auto-create organization if user doesn't have one
-    try {
-      await supabase.functions.invoke('ensure-org');
-    } catch {
-      // Non-critical: org creation can be retried
-      console.warn('ensure-org call failed, will retry on next sign-in');
-    }
+    await this.ensureOrg();
 
     return data.user;
   }
@@ -44,6 +46,32 @@ export class AuthManager {
   async getSession(): Promise<Session | null> {
     const { data } = await supabase.auth.getSession();
     return data.session;
+  }
+
+  async ensureOrg(): Promise<OrgInfo | null> {
+    try {
+      const { data, error } = await supabase.functions.invoke('ensure-org');
+      if (error) {
+        console.warn('ensure-org failed:', error);
+        return null;
+      }
+      const result = data as { org_id?: string; org_name?: string; role?: string } | null;
+      if (result?.org_id) {
+        this.orgInfo = {
+          orgId: result.org_id,
+          orgName: result.org_name ?? '',
+          role: result.role ?? 'member',
+        };
+      }
+      return this.orgInfo;
+    } catch {
+      console.warn('ensure-org call failed, will retry on next sign-in');
+      return null;
+    }
+  }
+
+  getOrgInfo(): OrgInfo | null {
+    return this.orgInfo;
   }
 
   onAuthStateChange(callback: (user: User | null) => void): () => void {

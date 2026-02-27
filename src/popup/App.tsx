@@ -35,6 +35,7 @@ function MainApp({ user }: { user: User }) {
   const [lastError, setLastError] = useState<string | null>(null);
   const [usageUsed, setUsageUsed] = useState(0);
   const [usageLimit, setUsageLimit] = useState(30);
+  const [orgName, setOrgName] = useState<string | null>(null);
   const [listKey, setListKey] = useState(0);
 
   const fetchState = useCallback(async () => {
@@ -77,6 +78,16 @@ function MainApp({ user }: { user: User }) {
       // Fallback to defaults
     });
   }, [user.id, listKey]);
+
+  // Fetch org info
+  useEffect(() => {
+    import('../lib/auth').then(({ authManager }) => {
+      const org = authManager.getOrgInfo();
+      if (org) {
+        setOrgName(org.orgName);
+      }
+    }).catch(() => {});
+  }, []);
 
   const sendMessage = async (type: string) => {
     setIsLoading(true);
@@ -137,6 +148,7 @@ function MainApp({ user }: { user: User }) {
           displayName={user.user_metadata?.['full_name'] as string | null ?? null}
           email={user.email ?? ''}
           avatarUrl={user.user_metadata?.['avatar_url'] as string | null}
+          orgName={orgName}
           usageUsed={usageUsed}
           usageLimit={usageLimit}
           onSignOut={handleSignOut}

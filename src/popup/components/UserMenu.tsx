@@ -2,6 +2,7 @@ interface UserMenuProps {
   displayName: string | null;
   email: string;
   avatarUrl?: string | null;
+  orgName?: string | null;
   usageUsed: number;
   usageLimit: number;
   onSignOut: () => void;
@@ -11,6 +12,7 @@ export default function UserMenu({
   displayName,
   email,
   avatarUrl,
+  orgName,
   usageUsed,
   usageLimit,
   onSignOut,
@@ -27,6 +29,9 @@ export default function UserMenu({
 
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-900 truncate">{displayName ?? email}</p>
+        {orgName && (
+          <p className="text-xs text-[#7C3AED] truncate" data-testid="org-name">{orgName}</p>
+        )}
         <p className="text-xs text-gray-400">
           {usageUsed}/{usageLimit} 分鐘已用
         </p>

@@ -7,6 +7,7 @@ describe('UserMenu', () => {
     displayName: 'Test User',
     email: 'test@example.com',
     avatarUrl: null,
+    orgName: null as string | null,
     usageUsed: 1,
     usageLimit: 3,
     onSignOut: vi.fn(),
@@ -21,6 +22,16 @@ describe('UserMenu', () => {
   it('shows email when no display name', () => {
     render(<UserMenu {...defaultProps} displayName={null} />);
     expect(screen.getByText('test@example.com')).toBeInTheDocument();
+  });
+
+  it('shows org name when provided', () => {
+    render(<UserMenu {...defaultProps} orgName="MeowCloud" />);
+    expect(screen.getByTestId('org-name')).toHaveTextContent('MeowCloud');
+  });
+
+  it('hides org name when null', () => {
+    render(<UserMenu {...defaultProps} />);
+    expect(screen.queryByTestId('org-name')).not.toBeInTheDocument();
   });
 
   it('calls onSignOut when button clicked', () => {
