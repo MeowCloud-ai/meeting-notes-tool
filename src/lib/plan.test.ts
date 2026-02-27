@@ -11,9 +11,8 @@ import { supabase } from './supabase';
 import { PlanManager } from './plan';
 
 const mockFrom = vi.mocked(supabase.from);
-const mockRpc = vi.mocked(supabase.rpc);
 
-function mockProfileSelect(data: Record<string, unknown> | null, error: Record<string, unknown> | null = null) {
+function mockUsageSelect(data: Record<string, unknown> | null, error: Record<string, unknown> | null = null) {
   mockFrom.mockReturnValue({
     select: vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
@@ -34,34 +33,36 @@ describe('PlanManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     manager = new PlanManager();
-    mockProfileSelect({
+    mockUsageSelect({
       plan_type: 'free',
+      monthly_minutes_used: 0,
       monthly_recording_count: 0,
       monthly_reset_at: futureReset,
     });
   });
 
   describe('getUsage', () => {
-    it('returns usage for free plan', async () => {
+    it('returns usage for free plan (30 min limit)', async () => {
       const usage = await manager.getUsage(userId);
-      expect(usage.used).toBe(0);
-      expect(usage.limit).toBe(3);
+      expect(usage.minutesUsed).toBe(0);
+      expect(usage.minutesLimit).toBe(30);
     });
 
-    it('returns usage for starter plan', async () => {
-      mockProfileSelect({
+    it('returns usage for starter plan (300 min limit)', async () => {
+      mockUsageSelect({
         plan_type: 'starter',
+        monthly_minutes_used: 50,
         monthly_recording_count: 5,
         monthly_reset_at: futureReset,
       });
 
       const usage = await manager.getUsage(userId);
-      expect(usage.used).toBe(5);
-      expect(usage.limit).toBe(30);
+      expect(usage.minutesUsed).toBe(50);
+      expect(usage.minutesLimit).toBe(300);
     });
 
     it('throws on error', async () => {
-      mockProfileSelect(null, { message: 'Not found' });
+      mockUsageSelect(null, { message: 'Not found' });
       await expect(manager.getUsage(userId)).rejects.toThrow('Failed to get usage');
     });
   });
@@ -72,30 +73,22 @@ describe('PlanManager', () => {
       expect(result.allowed).toBe(true);
     });
 
-    it('blocks at limit (3/3)', async () => {
-      mockProfileSelect({
+    it('blocks when minutes exhausted (30/30)', async () => {
+      mockUsageSelect({
         plan_type: 'free',
+        monthly_minutes_used: 30,
         monthly_recording_count: 3,
         monthly_reset_at: futureReset,
       });
 
       const result = await manager.canRecord(userId);
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('額度已用完');
+      expect(result.reason).toContain('時間已用完');
     });
   });
 
-  describe('incrementUsage', () => {
-    it('calls RPC to increment', async () => {
-      mockRpc.mockResolvedValue({ data: null, error: null } as ReturnType<typeof mockRpc> extends Promise<infer T> ? T : never);
-
-      await manager.incrementUsage(userId);
-      expect(mockRpc).toHaveBeenCalledWith('increment_recording_count', { p_user_id: userId });
-    });
-
-    it('falls back on RPC error', async () => {
-      mockRpc.mockResolvedValue({ data: null, error: { message: 'Not found' } } as ReturnType<typeof mockRpc> extends Promise<infer T> ? T : never);
-
+  describe('addMinutes', () => {
+    it('adds minutes to usage', async () => {
       const mockUpdate = vi.fn().mockReturnValue({
         eq: vi.fn().mockResolvedValue({ error: null }),
       });
@@ -103,7 +96,7 @@ describe('PlanManager', () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
-              data: { monthly_recording_count: 2, monthly_reset_at: futureReset },
+              data: { monthly_minutes_used: 10, monthly_recording_count: 2, monthly_reset_at: futureReset },
               error: null,
             }),
           }),
@@ -111,13 +104,13 @@ describe('PlanManager', () => {
         update: mockUpdate,
       } as ReturnType<typeof mockFrom>);
 
-      await manager.incrementUsage(userId);
+      await manager.addMinutes(userId, 5);
       expect(mockUpdate).toHaveBeenCalled();
     });
   });
 
   describe('monthly reset', () => {
-    it('resets count when past reset date', async () => {
+    it('resets when past reset date', async () => {
       const pastReset = new Date(Date.now() - 86400000).toISOString();
       const mockUpdate = vi.fn().mockReturnValue({
         eq: vi.fn().mockResolvedValue({ error: null }),
@@ -129,6 +122,7 @@ describe('PlanManager', () => {
             single: vi.fn().mockResolvedValue({
               data: {
                 plan_type: 'free',
+                monthly_minutes_used: 25,
                 monthly_recording_count: 3,
                 monthly_reset_at: pastReset,
               },

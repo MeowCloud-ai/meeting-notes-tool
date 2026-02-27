@@ -4,11 +4,21 @@
   "name": "MeowMeet",
   "version": "0.1.0",
   "description": "一鍵錄音，AI 自動產出會議摘要。Record meetings with one click, get AI-powered summaries automatically.",
-  "permissions": ["tabCapture", "storage", "identity", "activeTab", "offscreen"],
+  "permissions": [
+    "tabCapture",
+    "storage",
+    "identity",
+    "activeTab",
+    "offscreen"
+  ],
   "host_permissions": [],
   "oauth2": {
-    "client_id": "236935341601-36b75g06ctnn50760tan6qvm4o2v65ln.apps.googleusercontent.com",
-    "scopes": ["openid", "email", "profile"]
+    "client_id": "236935341601-pblbq373pkuo8mk7ibai10u1lcqi5gfc.apps.googleusercontent.com",
+    "scopes": [
+      "openid",
+      "email",
+      "profile"
+    ]
   },
   "action": {
     "default_popup": "popup.html",
@@ -23,11 +33,17 @@
     "service_worker": "src/background/index.ts",
     "type": "module"
   },
-  "content_scripts": [{
-    "matches": ["<all_urls>"],
-    "js": ["src/content/index.ts"],
-    "run_at": "document_idle"
-  }],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/index.ts"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

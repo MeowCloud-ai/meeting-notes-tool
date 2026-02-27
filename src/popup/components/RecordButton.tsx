@@ -20,8 +20,8 @@ export default function RecordButton({
   if (isLoading) {
     return (
       <div className="flex flex-col items-center gap-3">
-        <div className="w-16 h-16 rounded-full bg-gray-300 animate-pulse" />
-        <span className="text-sm text-gray-500">處理中...</span>
+        <div className="w-16 h-16 rounded-full bg-gray-200 animate-pulse" />
+        <span className="text-sm text-gray-400">處理中...</span>
       </div>
     );
   }
@@ -31,12 +31,12 @@ export default function RecordButton({
       <div className="flex flex-col items-center gap-3">
         <button
           onClick={onStart}
-          className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 transition-colors shadow-lg flex items-center justify-center"
+          className="w-16 h-16 rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] transition-all shadow-primary-glow flex items-center justify-center"
           aria-label="開始錄音"
         >
           <div className="w-6 h-6 rounded-full bg-white" />
         </button>
-        <span className="text-sm text-gray-600">準備中</span>
+        <span className="text-sm text-gray-500">點擊開始錄音</span>
       </div>
     );
   }
@@ -47,7 +47,7 @@ export default function RecordButton({
         {isPaused ? (
           <button
             onClick={onResume}
-            className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 transition-colors shadow flex items-center justify-center"
+            className="w-12 h-12 rounded-full bg-emerald-500 hover:bg-emerald-600 transition-all shadow-card flex items-center justify-center"
             aria-label="繼續錄音"
           >
             <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -57,7 +57,7 @@ export default function RecordButton({
         ) : (
           <button
             onClick={onPause}
-            className="w-12 h-12 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors shadow flex items-center justify-center"
+            className="w-12 h-12 rounded-full bg-[#F59E0B] hover:bg-amber-500 transition-all shadow-card flex items-center justify-center"
             aria-label="暫停錄音"
           >
             <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -72,14 +72,14 @@ export default function RecordButton({
 
         <button
           onClick={onStop}
-          className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-800 transition-colors shadow flex items-center justify-center"
+          className="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-800 transition-all shadow-card flex items-center justify-center"
           aria-label="停止錄音"
         >
           <div className="w-5 h-5 bg-white rounded-sm" />
         </button>
       </div>
-      <span className="text-sm font-medium text-red-600">
-        {isPaused ? '暫停' : '錄音中'}
+      <span className="text-sm font-medium text-red-500">
+        {isPaused ? '暫停' : '🔴 錄音中'}
       </span>
     </div>
   );

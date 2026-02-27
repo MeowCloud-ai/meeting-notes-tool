@@ -40,7 +40,7 @@ export default function RecordingDetail({ recording, onBack }: RecordingDetailPr
       <div className="flex items-center gap-2">
         <button
           onClick={onBack}
-          className="text-sm text-gray-500 hover:text-gray-700"
+          className="text-sm text-gray-400 hover:text-[#7C3AED] transition-colors"
         >
           ← 返回
         </button>
@@ -55,19 +55,21 @@ export default function RecordingDetail({ recording, onBack }: RecordingDetailPr
 
       {/* Content */}
       {loading ? (
-        <div className="text-center text-sm text-gray-400 py-8">載入中...</div>
+        <div className="text-center text-sm text-gray-300 py-8">載入中...</div>
       ) : activeTab === 0 ? (
-        transcript ? (
+        transcript && transcript.content?.trim() ? (
           <TranscriptView transcript={transcript} />
         ) : (
-          <div className="text-center text-sm text-gray-400 py-8">
-            {recording.status === 'transcribing' ? '轉錄中，請稍候...' : '尚無逐字稿'}
+          <div className="text-center text-sm text-gray-300 py-8">
+            {recording.status === 'transcribing' ? '轉錄中，請稍候...' :
+             transcript && !transcript.content?.trim() ? '錄音中無語音內容（可能是靜音或太短）' :
+             '尚無逐字稿'}
           </div>
         )
       ) : summary ? (
         <SummaryView summary={summary} />
       ) : (
-        <div className="text-center text-sm text-gray-400 py-8">
+        <div className="text-center text-sm text-gray-300 py-8">
           {recording.status === 'summarizing' ? '摘要產生中，請稍候...' : '尚無摘要'}
         </div>
       )}

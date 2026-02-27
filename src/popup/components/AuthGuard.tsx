@@ -23,8 +23,11 @@ export default function AuthGuard({ children }: AuthGuardProps) {
 
   if (loading) {
     return (
-      <div className="w-80 p-6 flex items-center justify-center">
-        <span className="animate-spin text-2xl">⏳</span>
+      <div className="w-80 min-h-[400px] bg-white flex flex-col">
+        <div className="gradient-signature h-[3px] w-full shrink-0" />
+        <div className="flex-1 flex items-center justify-center">
+          <span className="animate-spin text-2xl">⏳</span>
+        </div>
       </div>
     );
   }

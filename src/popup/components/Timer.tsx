@@ -36,7 +36,7 @@ export default function Timer({ isRunning, startTime }: TimerProps) {
   }, [isRunning, startTime, clearTimer]);
 
   return (
-    <div className="text-3xl font-mono text-center tabular-nums" data-testid="timer">
+    <div className="text-3xl font-mono text-center tabular-nums text-gray-900 tracking-wider" data-testid="timer">
       {formatTime(isRunning ? elapsed : 0)}
     </div>
   );

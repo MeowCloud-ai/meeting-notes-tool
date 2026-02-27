@@ -39,7 +39,7 @@ export class SegmentUploader {
   }
 
   async uploadSegment(recordingId: string, segmentIndex: number, blob: Blob): Promise<string> {
-    const path = `recordings/${this.userId}/${recordingId}/segment-${segmentIndex}.webm`;
+    const path = `${this.userId}/${recordingId}/segment_${segmentIndex}.webm`;
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       const { error } = await supabase.storage.from('recordings').upload(path, blob, {

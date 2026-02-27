@@ -6,12 +6,12 @@ interface TranscriptViewProps {
 }
 
 const SPEAKER_COLORS = [
-  'text-blue-700',
-  'text-green-700',
-  'text-purple-700',
-  'text-orange-700',
-  'text-pink-700',
-  'text-teal-700',
+  'text-[#7C3AED]',
+  'text-emerald-600',
+  'text-[#EC4899]',
+  'text-[#F59E0B]',
+  'text-blue-600',
+  'text-teal-600',
 ];
 
 interface ParsedLine {
@@ -21,9 +21,15 @@ interface ParsedLine {
 }
 
 function parseTranscriptLine(line: string): ParsedLine | null {
-  const match = line.match(/^\[(.+?)\]\s+(\d{2}:\d{2})\s+-\s+(.+)$/);
-  if (!match) return null;
-  return { speaker: match[1]!, timestamp: match[2]!, text: match[3]! };
+  // Format from Deepgram: [0:00] Speaker 0: text
+  const match1 = line.match(/^\[(\d+:\d{2})\]\s+(Speaker \d+):\s+(.+)$/);
+  if (match1) return { timestamp: match1[1]!, speaker: match1[2]!, text: match1[3]! };
+  // Alternate format: [Speaker] 00:00 - text
+  const match2 = line.match(/^\[(.+?)\]\s+(\d{2}:\d{2})\s+-\s+(.+)$/);
+  if (match2) return { speaker: match2[1]!, timestamp: match2[2]!, text: match2[3]! };
+  // Plain text line
+  if (line.trim()) return { speaker: '', timestamp: '', text: line.trim() };
+  return null;
 }
 
 function getSpeakerColor(speaker: string, speakerMap: Map<string, number>): string {
@@ -63,12 +69,12 @@ export default function TranscriptView({ transcript }: TranscriptViewProps) {
         placeholder="搜尋逐字稿..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/30 focus:border-[#7C3AED]/50 transition-all"
       />
 
       <div className="flex flex-col gap-1 max-h-96 overflow-y-auto">
         {filteredLines.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">
+          <p className="text-sm text-gray-300 text-center py-4">
             {search ? '無搜尋結果' : '尚無逐字稿內容'}
           </p>
         ) : (
@@ -77,8 +83,8 @@ export default function TranscriptView({ transcript }: TranscriptViewProps) {
               <span className={`font-medium ${getSpeakerColor(line.speaker, speakerMap)}`}>
                 [{line.speaker}]
               </span>{' '}
-              <span className="text-gray-400 text-xs">{line.timestamp}</span>
-              <p className="text-gray-800 mt-0.5">{line.text}</p>
+              <span className="text-gray-300 text-xs font-mono">{line.timestamp}</span>
+              <p className="text-gray-700 mt-0.5">{line.text}</p>
             </div>
           ))
         )}

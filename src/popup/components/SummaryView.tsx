@@ -11,18 +11,18 @@ export default function SummaryView({ summary }: SummaryViewProps) {
     <div className="flex flex-col gap-3 max-h-96 overflow-y-auto">
       {/* Raw Summary */}
       {summary.raw_summary && (
-        <div className="p-2 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-700">{summary.raw_summary}</p>
+        <div className="p-3 bg-gray-50/80 rounded-xl shadow-card">
+          <p className="text-sm text-gray-700 leading-relaxed">{summary.raw_summary}</p>
         </div>
       )}
 
       {/* Highlights */}
       {summary.highlights.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-1">📌 重點結論</h3>
+          <h3 className="text-sm font-semibold text-gray-600 mb-1.5">📌 重點結論</h3>
           <ul className="flex flex-col gap-1">
             {summary.highlights.map((h, i) => (
-              <li key={i} className="text-sm text-gray-800 pl-4 relative before:content-['•'] before:absolute before:left-1 before:text-gray-400">
+              <li key={i} className="text-sm text-gray-700 pl-4 relative before:content-['•'] before:absolute before:left-1 before:text-[#7C3AED]">
                 {h}
               </li>
             ))}
@@ -33,8 +33,8 @@ export default function SummaryView({ summary }: SummaryViewProps) {
       {/* Action Items */}
       {summary.action_items.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-1">✅ 待辦事項</h3>
-          <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-semibold text-gray-600 mb-1.5">✅ 待辦事項</h3>
+          <div className="flex flex-col gap-1.5">
             {summary.action_items.map((item, i) => (
               <ActionItemCard key={i} item={item} />
             ))}
@@ -45,8 +45,8 @@ export default function SummaryView({ summary }: SummaryViewProps) {
       {/* Key Dialogues */}
       {summary.key_dialogues.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-1">💬 關鍵對話</h3>
-          <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-semibold text-gray-600 mb-1.5">💬 關鍵對話</h3>
+          <div className="flex flex-col gap-1.5">
             {summary.key_dialogues.map((d, i) => (
               <KeyDialogueCard key={i} dialogue={d} />
             ))}
@@ -58,7 +58,7 @@ export default function SummaryView({ summary }: SummaryViewProps) {
         summary.action_items.length === 0 &&
         summary.key_dialogues.length === 0 &&
         !summary.raw_summary && (
-          <p className="text-sm text-gray-400 text-center py-4">尚無摘要內容</p>
+          <p className="text-sm text-gray-300 text-center py-4">尚無摘要內容</p>
         )}
     </div>
   );

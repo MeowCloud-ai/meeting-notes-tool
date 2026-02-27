@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80" width="400" height="320">
+  <!-- MeowCloud Logo V1 — 圓框眼鏡 -->
+  <path d="M14,34 L28,8 C30,5 34,5 36,9 L40,20 C43,17 46,16 50,16 C54,16 57,17 60,20 L64,9 C66,5 70,5 72,8 L86,34 C90,40 90,48 86,54 C82,60 70,64 50,64 C30,64 18,60 14,54 C10,48 10,40 14,34Z" fill="#7C3AED"/>
+  <circle cx="36" cy="40" r="10" fill="none" stroke="#fff" stroke-width="2.5"/>
+  <circle cx="64" cy="40" r="10" fill="none" stroke="#fff" stroke-width="2.5"/>
+  <path d="M46,40 Q50,36 54,40" fill="none" stroke="#fff" stroke-width="2.5"/>
+  <path d="M30,40 Q36,46 42,40" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M58,40 Q64,46 70,40" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+</svg>

@@ -1,10 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const PLAN_LIMITS: Record<string, number> = {
-  free: 3,
-  starter: 30,
-  pro: 100,
-  business: 9999,
+// Plan limits in MINUTES per month
+const PLAN_LIMITS_MINUTES: Record<string, number> = {
+  free: 30,
+  starter: 300,
+  pro: 1500,
+  business: 99999,
 };
 
 Deno.serve(async (req) => {
@@ -25,21 +26,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
     }
 
-    // Get profile
-    const { data: profile, error: profileError } = await supabase
+    const { data: usage, error: usageError } = await supabase
       .from('meet_usage')
-      .select('plan_type, monthly_recording_count, monthly_reset_at')
-      .eq('id', user.id)
+      .select('plan_type, monthly_minutes_used, monthly_recording_count, monthly_reset_at')
+      .eq('user_id', user.id)
       .single();
 
-    if (profileError || !profile) {
-      return new Response(JSON.stringify({ error: 'Profile not found' }), { status: 404 });
+    if (usageError || !usage) {
+      return new Response(JSON.stringify({ error: 'Usage not found' }), { status: 404 });
     }
 
     // Check if monthly reset needed
-    const resetAt = new Date(profile.monthly_reset_at);
+    const resetAt = new Date(usage.monthly_reset_at);
     const now = new Date();
-    let currentCount = profile.monthly_recording_count;
+    let minutesUsed = usage.monthly_minutes_used ?? 0;
 
     if (now >= resetAt) {
       const nextReset = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -47,21 +47,26 @@ Deno.serve(async (req) => {
         .from('meet_usage')
         .update({
           monthly_recording_count: 0,
+          monthly_minutes_used: 0,
           monthly_reset_at: nextReset.toISOString(),
-          updated_at: now.toISOString(),
         })
-        .eq('id', user.id);
-      currentCount = 0;
+        .eq('user_id', user.id);
+      minutesUsed = 0;
     }
 
-    const limit = PLAN_LIMITS[profile.plan_type] ?? 3;
-    const allowed = currentCount < limit;
+    const limitMinutes = PLAN_LIMITS_MINUTES[usage.plan_type] ?? 30;
+    const allowed = minutesUsed < limitMinutes;
 
     return new Response(
       JSON.stringify({
         allowed,
-        usage: { used: currentCount, limit, resetAt: resetAt.toISOString() },
-        reason: allowed ? undefined : '本月錄音額度已用完',
+        usage: {
+          minutesUsed,
+          minutesLimit: limitMinutes,
+          recordingCount: usage.monthly_recording_count,
+          resetAt: resetAt.toISOString(),
+        },
+        reason: allowed ? undefined : '本月錄音時間已用完，請升級方案',
       }),
       { headers: { 'Content-Type': 'application/json' } }
     );

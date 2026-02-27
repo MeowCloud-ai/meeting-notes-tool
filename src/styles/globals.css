@@ -1,1 +1,34 @@
 @import 'tailwindcss';
+
+/* MeowCloud Design System - Custom Utilities */
+@layer base {
+  * {
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  .gradient-signature {
+    background: linear-gradient(90deg, #7C3AED, #EC4899, #F59E0B, #EC4899, #7C3AED);
+  }
+
+  .shadow-card {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  .shadow-primary-glow {
+    box-shadow: 0 4px 14px rgba(124,58,237,0.35);
+  }
+
+  .btn-pill {
+    border-radius: 999px;
+  }
+
+  .aurora-bg {
+    background: linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(236,72,153,0.04) 50%, rgba(245,158,11,0.03) 100%);
+  }
+}

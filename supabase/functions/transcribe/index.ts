@@ -26,95 +26,26 @@ interface TranscriptLine {
   text: string;
 }
 
-export function formatTimestamp(seconds: number): string {
+function formatTimestamp(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-export function mergeWordsToLines(words: DeepgramWord[]): TranscriptLine[] {
-  if (words.length === 0) return [];
-
-  const lines: TranscriptLine[] = [];
-  let currentSpeaker = words[0]!.speaker;
-  let currentTimestamp = words[0]!.start;
-  let currentWords: string[] = [];
-
-  for (const word of words) {
-    if (word.speaker !== currentSpeaker) {
-      lines.push({
-        speaker: currentSpeaker,
-        timestamp: currentTimestamp,
-        text: currentWords.join(' '),
-      });
-      currentSpeaker = word.speaker;
-      currentTimestamp = word.start;
-      currentWords = [];
-    }
-    currentWords.push(word.punctuated_word);
-  }
-
-  if (currentWords.length > 0) {
-    lines.push({
-      speaker: currentSpeaker,
-      timestamp: currentTimestamp,
-      text: currentWords.join(' '),
-    });
-  }
-
-  return lines;
-}
-
-export function formatTranscript(lines: TranscriptLine[]): string {
-  return lines
-    .map((line) => `[Speaker ${line.speaker + 1}] ${formatTimestamp(line.timestamp)} - ${line.text}`)
-    .join('\n');
-}
-
-export function extractSpeakers(lines: TranscriptLine[]): Array<{ id: string; name: string }> {
-  const speakerSet = new Set(lines.map((l) => l.speaker));
-  return Array.from(speakerSet)
-    .sort((a, b) => a - b)
-    .map((s) => ({ id: String(s), name: `Speaker ${s + 1}` }));
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 serve(async (req: Request) => {
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization' }), { status: 401 });
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const deepgramApiKey = Deno.env.get('DEEPGRAM_API_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify user
-    const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: authError,
-    } = await userClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-    }
-
     const { recordingId } = await req.json();
     if (!recordingId) {
       return new Response(JSON.stringify({ error: 'Missing recordingId' }), { status: 400 });
     }
 
-    // Update status to transcribing
-    await supabase
-      .from('recordings')
-      .update({ status: 'transcribing' })
-      .eq('id', recordingId);
-
-    // Get recording to find segments
+    // Get recording
     const { data: recording, error: recError } = await supabase
       .from('recordings')
       .select('*')
@@ -125,27 +56,36 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'Recording not found' }), { status: 404 });
     }
 
-    // Download and concatenate all segments
-    const segmentBlobs: Uint8Array[] = [];
-    for (let i = 0; i < recording.segment_count; i++) {
-      const path = `recordings/${user.id}/${recordingId}/segment-${i}.webm`;
+    // Update status
+    await supabase.from('recordings').update({ status: 'transcribing' }).eq('id', recordingId);
+
+    // Get audio from storage
+    const segments: Uint8Array[] = [];
+    for (let i = 0; i < (recording.segment_count || 1); i++) {
+      const path = `${recording.user_id}/${recordingId}/segment_${i}.webm`;
       const { data, error } = await supabase.storage.from('recordings').download(path);
-      if (error || !data) {
-        throw new Error(`Failed to download segment ${i}: ${error?.message}`);
+      if (error) {
+        console.error(`Failed to download segment ${i}:`, error);
+        continue;
       }
-      segmentBlobs.push(new Uint8Array(await data.arrayBuffer()));
+      segments.push(new Uint8Array(await data.arrayBuffer()));
     }
 
-    // Merge segments into single buffer
-    const totalLength = segmentBlobs.reduce((sum, b) => sum + b.length, 0);
+    if (segments.length === 0) {
+      await supabase.from('recordings').update({ status: 'failed' }).eq('id', recordingId);
+      return new Response(JSON.stringify({ error: 'No audio segments found' }), { status: 400 });
+    }
+
+    // Merge segments
+    const totalLength = segments.reduce((sum, s) => sum + s.length, 0);
     const merged = new Uint8Array(totalLength);
     let offset = 0;
-    for (const blob of segmentBlobs) {
-      merged.set(blob, offset);
-      offset += blob.length;
+    for (const seg of segments) {
+      merged.set(seg, offset);
+      offset += seg.length;
     }
 
-    // Call Deepgram API
+    // Send to Deepgram
     const dgResponse = await fetch(
       'https://api.deepgram.com/v1/listen?model=nova-2&language=zh-TW&diarize=true&punctuate=true&smart_format=true',
       {
@@ -160,44 +100,79 @@ serve(async (req: Request) => {
 
     if (!dgResponse.ok) {
       const errText = await dgResponse.text();
-      throw new Error(`Deepgram API error: ${dgResponse.status} ${errText}`);
+      console.error('Deepgram error:', errText);
+      await supabase.from('recordings').update({ status: 'failed' }).eq('id', recordingId);
+      return new Response(JSON.stringify({ error: 'Transcription failed: ' + errText }), { status: 500 });
     }
 
     const dgResult: DeepgramResponse = await dgResponse.json();
+
+    // Format transcript
     const words = dgResult.results?.channels?.[0]?.alternatives?.[0]?.words ?? [];
-    const lines = mergeWordsToLines(words);
-    const content = formatTranscript(lines);
-    const speakers = extractSpeakers(lines);
-    const wordCount = words.length;
+    const fullTranscript = dgResult.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? '';
 
-    // Save transcript
-    const { data: transcript, error: insertError } = await supabase
-      .from('transcripts')
-      .insert({
-        recording_id: recordingId,
-        content,
-        speakers,
-        language: 'zh-TW',
-        word_count: wordCount,
-      })
-      .select()
-      .single();
+    // Group by speaker
+    const lines: TranscriptLine[] = [];
+    let currentSpeaker = -1;
+    let currentText = '';
+    let currentTimestamp = 0;
 
-    if (insertError) {
-      throw new Error(`Failed to save transcript: ${insertError.message}`);
+    for (const word of words) {
+      if (word.speaker !== currentSpeaker) {
+        if (currentText) {
+          lines.push({ speaker: currentSpeaker, timestamp: currentTimestamp, text: currentText.trim() });
+        }
+        currentSpeaker = word.speaker;
+        currentTimestamp = word.start;
+        currentText = word.punctuated_word + ' ';
+      } else {
+        currentText += word.punctuated_word + ' ';
+      }
+    }
+    if (currentText) {
+      lines.push({ speaker: currentSpeaker, timestamp: currentTimestamp, text: currentText.trim() });
     }
 
-    // Update recording status to summarizing
-    await supabase
-      .from('recordings')
-      .update({ status: 'summarizing' })
-      .eq('id', recordingId);
+    // Format content
+    const content = lines
+      .map((l) => `[${formatTimestamp(l.timestamp)}] Speaker ${l.speaker}: ${l.text}`)
+      .join('\n');
 
-    return new Response(JSON.stringify({ transcript }), {
-      headers: { 'Content-Type': 'application/json' },
+    // Get unique speakers
+    const speakers = [...new Set(words.map((w) => w.speaker))].map((s) => ({
+      id: s,
+      label: `Speaker ${s}`,
+    }));
+
+    // Save transcript
+    await supabase.from('transcripts').insert({
+      recording_id: recordingId,
+      content: content || fullTranscript,
+      speakers,
+      language: 'zh-TW',
+      word_count: words.length,
     });
+
+    // Update status to summarizing
+    await supabase.from('recordings').update({ status: 'summarizing' }).eq('id', recordingId);
+
+    // Trigger summarization
+    const sumResponse = await fetch(`${supabaseUrl}/functions/v1/summarize`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ recordingId }),
+    });
+
+    if (!sumResponse.ok) {
+      console.error('Summarize trigger failed:', await sumResponse.text());
+    }
+
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: message }), { status: 500 });
+    console.error('Transcribe error:', err);
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
   }
 });

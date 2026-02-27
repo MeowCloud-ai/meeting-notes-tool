@@ -19,20 +19,20 @@ export default function ActionItemCard({ item }: ActionItemCardProps) {
   };
 
   return (
-    <div className="flex items-start gap-2 p-2 rounded-lg bg-green-50 border border-green-100">
+    <div className="flex items-start gap-2 p-2.5 rounded-xl bg-emerald-50/60 shadow-card">
       <span className="text-base mt-0.5">✅</span>
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-800">{item.text}</p>
         {item.assignee && (
-          <p className="text-xs text-gray-500 mt-0.5">👤 {item.assignee}</p>
+          <p className="text-xs text-gray-400 mt-0.5">👤 {item.assignee}</p>
         )}
         {item.due_date && (
-          <p className="text-xs text-gray-500">📅 {item.due_date}</p>
+          <p className="text-xs text-gray-400">📅 {item.due_date}</p>
         )}
       </div>
       <button
         onClick={handleCopy}
-        className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+        className="text-xs text-gray-300 hover:text-[#7C3AED] shrink-0 transition-colors"
         title="複製"
       >
         {copied ? '✓' : '📋'}

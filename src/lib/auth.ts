@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type { Session, User } from '@supabase/supabase-js';
 
-const GOOGLE_CLIENT_ID = '236935341601-36b75g06ctnn50760tan6qvm4o2v65ln.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '236935341601-pblbq373pkuo8mk7ibai10u1lcqi5gfc.apps.googleusercontent.com';
 
 export class AuthManager {
   private listeners: Set<(user: User | null) => void> = new Set();
@@ -23,6 +23,14 @@ export class AuthManager {
 
     if (error || !data.user) {
       throw new Error(error?.message ?? 'Sign in failed');
+    }
+
+    // Auto-create organization if user doesn't have one
+    try {
+      await supabase.functions.invoke('ensure-org');
+    } catch {
+      // Non-critical: org creation can be retried
+      console.warn('ensure-org call failed, will retry on next sign-in');
     }
 
     return data.user;
