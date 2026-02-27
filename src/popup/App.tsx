@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js';
 import AuthGuard from './components/AuthGuard';
 import UserMenu from './components/UserMenu';
 import RecordButton from './components/RecordButton';
+import MicStatus from './components/MicStatus';
 import Timer from './components/Timer';
 import RecordingList from './components/RecordingList';
 import RecordingDetail from './pages/RecordingDetail';
@@ -14,6 +15,7 @@ interface AppState {
   isPaused: boolean;
   startTime: number | null;
   tabId: number | null;
+  micEnabled: boolean;
 }
 
 const INITIAL_STATE: AppState = {
@@ -21,6 +23,7 @@ const INITIAL_STATE: AppState = {
   isPaused: false,
   startTime: null,
   tabId: null,
+  micEnabled: false,
 };
 
 function MainApp({ user }: { user: User }) {
@@ -162,6 +165,8 @@ function MainApp({ user }: { user: User }) {
         )}
 
         <Timer isRunning={state.isRecording && !state.isPaused} startTime={state.startTime} />
+
+        <MicStatus isRecording={state.isRecording} micEnabled={state.micEnabled} />
 
         <RecordButton
           isRecording={state.isRecording}

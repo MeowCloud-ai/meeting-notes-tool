@@ -43,7 +43,7 @@ describe('TabRecorder', () => {
       },
     );
 
-    mockChrome.runtime.sendMessage.mockResolvedValue({ success: true });
+    mockChrome.runtime.sendMessage.mockResolvedValue({ success: true, micEnabled: true });
   });
 
   describe('getState', () => {
@@ -53,6 +53,7 @@ describe('TabRecorder', () => {
       expect(state.isPaused).toBe(false);
       expect(state.startTime).toBeNull();
       expect(state.tabId).toBeNull();
+      expect(state.micEnabled).toBe(false);
     });
   });
 
@@ -81,13 +82,20 @@ describe('TabRecorder', () => {
       expect(mockChrome.offscreen.createDocument).not.toHaveBeenCalled();
     });
 
-    it('sends start message to offscreen with streamId', async () => {
+    it('sends start message to offscreen with streamId and enableMic', async () => {
       await recorder.startRecording(1);
       expect(mockChrome.runtime.sendMessage).toHaveBeenCalledWith({
         type: 'OFFSCREEN_START_RECORDING',
         target: 'offscreen',
         streamId: 'mock-stream-id',
+        enableMic: true,
       });
+    });
+
+    it('tracks micEnabled from offscreen response', async () => {
+      mockChrome.runtime.sendMessage.mockResolvedValue({ success: true, micEnabled: false });
+      await recorder.startRecording(1);
+      expect(recorder.getState().micEnabled).toBe(false);
     });
 
     it('sets red REC badge', async () => {

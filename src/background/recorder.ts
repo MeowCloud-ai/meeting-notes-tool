@@ -13,6 +13,7 @@ export interface RecordingState {
   isPaused: boolean;
   startTime: number | null;
   tabId: number | null;
+  micEnabled: boolean;
 }
 
 const INITIAL_STATE: RecordingState = {
@@ -20,12 +21,13 @@ const INITIAL_STATE: RecordingState = {
   isPaused: false,
   startTime: null,
   tabId: null,
+  micEnabled: false,
 };
 
 export class TabRecorder {
   private state: RecordingState = { ...INITIAL_STATE };
 
-  async startRecording(tabId: number): Promise<void> {
+  async startRecording(tabId: number, enableMic = true): Promise<void> {
     if (this.state.isRecording) {
       throw new Error('Already recording');
     }
@@ -34,17 +36,23 @@ export class TabRecorder {
 
     const streamId = await this.getMediaStreamId(tabId);
 
-    await chrome.runtime.sendMessage({
+    const response = (await chrome.runtime.sendMessage({
       type: 'OFFSCREEN_START_RECORDING',
       target: 'offscreen',
       streamId,
-    });
+      enableMic,
+    })) as { success: boolean; micEnabled?: boolean; error?: string };
+
+    if (!response.success) {
+      throw new Error(response.error ?? 'Failed to start recording');
+    }
 
     this.state = {
       isRecording: true,
       isPaused: false,
       startTime: Date.now(),
       tabId,
+      micEnabled: response.micEnabled ?? false,
     };
 
     await this.updateBadge();
