@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Recording } from '../../types/database';
 import RecordingItem from './RecordingItem';
@@ -12,7 +12,7 @@ export default function RecordingList({ onSelectRecording }: RecordingListProps)
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchRecordings() {
+    async function fetchRecordings(): Promise<void> {
       const { data } = await supabase
         .from('recordings')
         .select('*')
@@ -24,9 +24,14 @@ export default function RecordingList({ onSelectRecording }: RecordingListProps)
     }
 
     fetchRecordings();
-    // Auto-refresh every 5 seconds to catch new recordings
     const interval = setInterval(fetchRecordings, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  const handleTitleUpdate = useCallback((id: string, newTitle: string) => {
+    setRecordings((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, title: newTitle } : r)),
+    );
   }, []);
 
   if (loading) {
@@ -45,6 +50,7 @@ export default function RecordingList({ onSelectRecording }: RecordingListProps)
           key={rec.id}
           recording={rec}
           onClick={() => onSelectRecording(rec)}
+          onTitleUpdate={handleTitleUpdate}
         />
       ))}
     </div>
