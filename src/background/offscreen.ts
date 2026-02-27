@@ -23,15 +23,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     case 'OFFSCREEN_PAUSE_RECORDING':
       if (mediaRecorder?.state === 'recording') {
         mediaRecorder.pause();
+        sendResponse({ success: true, state: 'paused' });
+      } else {
+        sendResponse({ success: false, error: `Cannot pause: recorder state is ${mediaRecorder?.state ?? 'null'}` });
       }
-      sendResponse({ success: true });
       return false;
 
     case 'OFFSCREEN_RESUME_RECORDING':
       if (mediaRecorder?.state === 'paused') {
+        // Check if streams are still alive before resuming
+        const tabAlive = tabStream?.getTracks().some((t) => t.readyState === 'live') ?? false;
+        if (!tabAlive) {
+          sendResponse({ success: false, error: 'Tab audio stream ended during pause' });
+          return false;
+        }
         mediaRecorder.resume();
+        sendResponse({ success: true, state: 'recording' });
+      } else {
+        sendResponse({ success: false, error: `Cannot resume: recorder state is ${mediaRecorder?.state ?? 'null'}` });
       }
-      sendResponse({ success: true });
       return false;
 
     case 'OFFSCREEN_STOP_RECORDING':
