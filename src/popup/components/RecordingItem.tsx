@@ -1,9 +1,12 @@
 import type { Recording } from '../../types/database';
+import { supabase } from '../../lib/supabase';
 import StatusBadge from './StatusBadge';
+import EditableTitle from './EditableTitle';
 
 interface RecordingItemProps {
   recording: Recording;
   onClick: () => void;
+  onTitleUpdate?: (id: string, newTitle: string) => void;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -13,8 +16,18 @@ function formatDuration(seconds: number | null): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function RecordingItem({ recording, onClick }: RecordingItemProps) {
+export default function RecordingItem({ recording, onClick, onTitleUpdate }: RecordingItemProps) {
   const date = new Date(recording.created_at).toLocaleDateString('zh-TW');
+
+  const handleSaveTitle = async (newTitle: string): Promise<void> => {
+    const { error } = await supabase
+      .from('recordings')
+      .update({ title: newTitle })
+      .eq('id', recording.id);
+
+    if (error) throw error;
+    onTitleUpdate?.(recording.id, newTitle);
+  };
 
   return (
     <button
@@ -22,7 +35,7 @@ export default function RecordingItem({ recording, onClick }: RecordingItemProps
       onClick={onClick}
     >
       <div className="flex items-center justify-between">
-        <span className="font-medium text-sm text-gray-900 truncate flex-1">{recording.title}</span>
+        <EditableTitle value={recording.title} onSave={handleSaveTitle} />
         <StatusBadge status={recording.status} />
       </div>
       <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">

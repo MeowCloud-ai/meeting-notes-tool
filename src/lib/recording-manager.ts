@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { SegmentUploader } from './upload';
 import { triggerSegmentTranscription, triggerStitchTranscripts } from './api';
+import { deriveTitle } from './title-utils';
 import type { RecordingStatus } from '../types/database';
 
 export const MAX_RECORDING_DURATION_MS = 60 * 60 * 1000; // 60 minutes
@@ -62,7 +63,7 @@ export class RecordingManager {
       .from('recordings')
       .insert({
         user_id: this.userId,
-        title: tabTitle ?? 'Untitled Recording',
+        title: deriveTitle(tabUrl, tabTitle),
         status: 'recording' as RecordingStatus,
         segment_count: 0,
         tab_url: tabUrl,
