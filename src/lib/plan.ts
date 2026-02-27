@@ -59,11 +59,13 @@ export class PlanManager {
   async getUsage(userId: string): Promise<Usage> {
     await this.maybeResetMonthly(userId);
 
-    let { data, error } = await supabase
+    const { data: fetchedData, error } = await supabase
       .from('meet_usage')
       .select('plan_type, monthly_minutes_used, monthly_recording_count, monthly_reset_at')
       .eq('user_id', userId)
       .single();
+
+    let data = fetchedData;
 
     if (error || !data) {
       // Auto-create usage row if missing

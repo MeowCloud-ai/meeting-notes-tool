@@ -19,6 +19,6 @@ describe('TabSwitcher', () => {
   it('highlights active tab', () => {
     render(<TabSwitcher tabs={['逐字稿', '摘要']} activeTab={1} onTabChange={() => {}} />);
     const summaryTab = screen.getByText('摘要');
-    expect(summaryTab.className).toContain('text-blue-600');
+    expect(summaryTab.className).toContain('text-[#7C3AED]');
   });
 });

@@ -22,6 +22,11 @@ function mockUsageSelect(data: Record<string, unknown> | null, error: Record<str
     update: vi.fn().mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
     }),
+    upsert: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: null, error: { message: 'upsert failed' } }),
+      }),
+    }),
   } as ReturnType<typeof mockFrom>);
 }
 
@@ -61,9 +66,11 @@ describe('PlanManager', () => {
       expect(usage.minutesLimit).toBe(300);
     });
 
-    it('throws on error', async () => {
+    it('returns defaults when row missing and upsert fails', async () => {
       mockUsageSelect(null, { message: 'Not found' });
-      await expect(manager.getUsage(userId)).rejects.toThrow('Failed to get usage');
+      const usage = await manager.getUsage(userId);
+      expect(usage.minutesUsed).toBe(0);
+      expect(usage.minutesLimit).toBe(30);
     });
   });
 

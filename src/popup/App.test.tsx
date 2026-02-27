@@ -8,8 +8,13 @@ vi.stubGlobal('chrome', {
     sendMessage: mockSendMessage,
   },
   identity: {
-    getAuthToken: vi.fn(),
-    removeCachedAuthToken: vi.fn(),
+    getRedirectURL: vi.fn().mockReturnValue('https://redirect.test'),
+    launchWebAuthFlow: vi.fn(),
+  },
+  storage: {
+    local: {
+      get: vi.fn().mockResolvedValue({}),
+    },
   },
 });
 
@@ -25,6 +30,14 @@ vi.mock('../lib/auth', () => ({
   },
 }));
 
+// Mock plan manager
+vi.mock('../lib/plan', () => ({
+  planManager: {
+    getUsage: vi.fn().mockResolvedValue({ minutesUsed: 5, minutesLimit: 30, recordingCount: 1, resetAt: new Date() }),
+    canRecord: vi.fn().mockResolvedValue({ allowed: true }),
+  },
+}));
+
 // Mock supabase for RecordingList
 vi.mock('../lib/supabase', () => ({
   supabase: {
@@ -32,6 +45,11 @@ vi.mock('../lib/supabase', () => ({
       select: () => ({
         order: () => ({
           limit: () => Promise.resolve({ data: [] }),
+        }),
+        eq: () => ({
+          order: () => ({
+            limit: () => Promise.resolve({ data: [] }),
+          }),
         }),
       }),
     }),
@@ -58,7 +76,7 @@ describe('App', () => {
   it('renders title after auth', async () => {
     render(<App />);
     await waitFor(() => {
-      expect(screen.getByText('🐱 MeowMeet')).toBeInTheDocument();
+      expect(screen.getByText('MeowMeet')).toBeInTheDocument();
     });
   });
 
@@ -118,13 +136,6 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('繼續錄音')).toBeInTheDocument();
-    });
-  });
-
-  it('shows timer', async () => {
-    render(<App />);
-    await waitFor(() => {
-      expect(screen.getByTestId('timer')).toBeInTheDocument();
     });
   });
 

@@ -17,12 +17,12 @@ describe('UsageBar', () => {
   it('shows yellow when warning', () => {
     render(<UsageBar used={2} limit={3} />);
     const fill = screen.getByTestId('usage-bar-fill');
-    expect(fill.className).toContain('bg-yellow-500');
+    expect(fill.className).toContain('bg-[#F59E0B]');
   });
 
   it('shows blue when normal', () => {
     render(<UsageBar used={1} limit={3} />);
     const fill = screen.getByTestId('usage-bar-fill');
-    expect(fill.className).toContain('bg-blue-500');
+    expect(fill.className).toContain('bg-[#7C3AED]');
   });
 });

@@ -89,9 +89,9 @@ describe('SegmentUploader', () => {
       const blob = new Blob(['test'], { type: 'audio/webm' });
       const path = await uploader.uploadSegment('rec-1', 0, blob);
 
-      expect(path).toBe('recordings/user-123/rec-1/segment-0.webm');
+      expect(path).toBe('user-123/rec-1/segment_0.webm');
       expect(mockUpload).toHaveBeenCalledWith(
-        'recordings/user-123/rec-1/segment-0.webm',
+        'user-123/rec-1/segment_0.webm',
         blob,
         { contentType: 'audio/webm;codecs=opus', upsert: true },
       );
@@ -108,7 +108,7 @@ describe('SegmentUploader', () => {
       const blob = new Blob(['test']);
       const path = await uploader.uploadSegment('rec-1', 0, blob);
 
-      expect(path).toBe('recordings/user-123/rec-1/segment-0.webm');
+      expect(path).toBe('user-123/rec-1/segment_0.webm');
       expect(mockUpload).toHaveBeenCalledTimes(3);
 
       vi.useRealTimers();

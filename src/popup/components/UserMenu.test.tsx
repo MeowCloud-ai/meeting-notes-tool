@@ -15,7 +15,7 @@ describe('UserMenu', () => {
   it('renders user info and usage', () => {
     render(<UserMenu {...defaultProps} />);
     expect(screen.getByText('Test User')).toBeInTheDocument();
-    expect(screen.getByText('1/3 場已用')).toBeInTheDocument();
+    expect(screen.getByText('1/3 分鐘已用')).toBeInTheDocument();
   });
 
   it('shows email when no display name', () => {
