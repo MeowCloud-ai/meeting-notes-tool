@@ -84,6 +84,31 @@ describe('AuthManager', () => {
     });
   });
 
+  describe('ensureOrg', () => {
+    it('stores org info on success', async () => {
+      vi.mocked(supabase.functions.invoke).mockResolvedValue({
+        data: { org_id: 'org-1', org_name: 'Test Org', role: 'admin' },
+        error: null,
+      });
+
+      const manager = new AuthManager();
+      const org = await manager.ensureOrg();
+      expect(org).toEqual({ orgId: 'org-1', orgName: 'Test Org', role: 'admin' });
+      expect(manager.getOrgInfo()).toEqual(org);
+    });
+
+    it('returns null on failure', async () => {
+      vi.mocked(supabase.functions.invoke).mockResolvedValue({
+        data: null,
+        error: { message: 'Failed', name: 'FunctionsError', context: {} },
+      } as ReturnType<typeof supabase.functions.invoke> extends Promise<infer T> ? T : never);
+
+      const manager = new AuthManager();
+      const org = await manager.ensureOrg();
+      expect(org).toBeNull();
+    });
+  });
+
   describe('signOut', () => {
     it('should sign out from Supabase', async () => {
       mockAuth.signOut.mockResolvedValue({ error: null });
