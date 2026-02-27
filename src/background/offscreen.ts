@@ -1,21 +1,29 @@
 /**
  * Offscreen document script — handles actual MediaRecorder in a DOM context.
  * Supports mixing tab audio + microphone audio via AudioContext.
+ * Emits segments every SEGMENT_DURATION_MS to background for upload.
  */
+
+export const DEFAULT_SEGMENT_DURATION_MS = 3 * 60 * 1000; // 3 minutes
 
 let mediaRecorder: MediaRecorder | null = null;
 let tabStream: MediaStream | null = null;
 let micStream: MediaStream | null = null;
 let audioContext: AudioContext | null = null;
-let chunks: Blob[] = [];
+let segmentIndex = 0;
 let micEnabled = false;
+let segmentDurationMs = DEFAULT_SEGMENT_DURATION_MS;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.target !== 'offscreen') return false;
 
   switch (message.type) {
     case 'OFFSCREEN_START_RECORDING':
-      handleStart(message.streamId, message.enableMic as boolean | undefined)
+      handleStart(
+        message.streamId,
+        message.enableMic as boolean | undefined,
+        message.segmentDurationMs as number | undefined,
+      )
         .then((result) => sendResponse({ success: true, micEnabled: result.micEnabled }))
         .catch((err: Error) => sendResponse({ success: false, error: err.message }));
       return true;
@@ -31,7 +39,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case 'OFFSCREEN_RESUME_RECORDING':
       if (mediaRecorder?.state === 'paused') {
-        // Check if streams are still alive before resuming
         const tabAlive = tabStream?.getTracks().some((t) => t.readyState === 'live') ?? false;
         if (!tabAlive) {
           sendResponse({ success: false, error: 'Tab audio stream ended during pause' });
@@ -77,14 +84,11 @@ function createMixedStream(tab: MediaStream, mic: MediaStream | null): { stream:
   const ctx = new AudioContext();
   const destination = ctx.createMediaStreamDestination();
 
-  // Tab audio source
   const tabSource = ctx.createMediaStreamSource(tab);
   tabSource.connect(destination);
 
-  // Mic audio source (if available)
   if (mic) {
     const micSource = ctx.createMediaStreamSource(mic);
-    // Slightly lower mic volume to balance with tab audio
     const micGain = ctx.createGain();
     micGain.gain.value = 0.8;
     micSource.connect(micGain);
@@ -94,8 +98,35 @@ function createMixedStream(tab: MediaStream, mic: MediaStream | null): { stream:
   return { stream: destination.stream, ctx };
 }
 
-async function handleStart(streamId: string, enableMic?: boolean): Promise<{ micEnabled: boolean }> {
-  // Get tab audio stream
+/**
+ * Send a completed segment blob to the background service worker.
+ * Uses base64 encoding since structured clone isn't available across contexts.
+ */
+async function sendSegmentToBackground(blob: Blob, index: number): Promise<void> {
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  const base64 = btoa(binary);
+
+  chrome.runtime.sendMessage({
+    type: 'SEGMENT_READY',
+    segmentIndex: index,
+    audioBase64: base64,
+    mimeType: 'audio/webm;codecs=opus',
+  });
+}
+
+async function handleStart(
+  streamId: string,
+  enableMic?: boolean,
+  customSegmentDurationMs?: number,
+): Promise<{ micEnabled: boolean }> {
+  segmentIndex = 0;
+  segmentDurationMs = customSegmentDurationMs ?? DEFAULT_SEGMENT_DURATION_MS;
+
   tabStream = await navigator.mediaDevices.getUserMedia({
     audio: {
       mandatory: {
@@ -105,33 +136,41 @@ async function handleStart(streamId: string, enableMic?: boolean): Promise<{ mic
     } as MediaTrackConstraints,
   });
 
-  // Attempt to get mic if requested (default: true)
   const shouldEnableMic = enableMic !== false;
   micStream = shouldEnableMic ? await getMicStream() : null;
   micEnabled = micStream !== null;
 
-  // Mix streams via AudioContext
   const { stream: mixedStream, ctx } = createMixedStream(tabStream, micStream);
   audioContext = ctx;
 
-  chunks = [];
+  // Accumulate chunks between timeslice boundaries
+  let currentChunks: Blob[] = [];
+
   mediaRecorder = new MediaRecorder(mixedStream, {
     mimeType: 'audio/webm;codecs=opus',
   });
 
   mediaRecorder.ondataavailable = (e) => {
     if (e.data.size > 0) {
-      chunks.push(e.data);
+      currentChunks.push(e.data);
+      // When timeslice fires, ondataavailable is called with current data.
+      // We treat each timeslice boundary as a segment boundary.
+      const segBlob = new Blob(currentChunks, { type: 'audio/webm;codecs=opus' });
+      const idx = segmentIndex;
+      segmentIndex++;
+      currentChunks = [];
+      sendSegmentToBackground(segBlob, idx).catch((err) =>
+        console.error('Failed to send segment to background:', err),
+      );
     }
   };
 
-  // Use 5-minute timeslice for segment uploads
-  mediaRecorder.start(5 * 60 * 1000);
+  mediaRecorder.start(segmentDurationMs);
 
   return { micEnabled };
 }
 
-async function handleStop(): Promise<{ audioBase64: string; mimeType: string }> {
+async function handleStop(): Promise<{ stopped: true; finalSegmentIndex: number }> {
   return new Promise((resolve, reject) => {
     if (!mediaRecorder) {
       reject(new Error('No active recorder'));
@@ -139,31 +178,23 @@ async function handleStop(): Promise<{ audioBase64: string; mimeType: string }> 
     }
 
     mediaRecorder.onstop = async () => {
-      const blob = new Blob(chunks, { type: 'audio/webm;codecs=opus' });
-
-      // Convert to base64 for transfer back to SW
-      const buffer = await blob.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]!);
-      }
-      const base64 = btoa(binary);
-
-      // Cleanup
+      // Cleanup streams
       tabStream?.getTracks().forEach((t) => t.stop());
       micStream?.getTracks().forEach((t) => t.stop());
       await audioContext?.close().catch(() => {});
       tabStream = null;
       micStream = null;
       audioContext = null;
+
+      const finalIdx = segmentIndex;
       mediaRecorder = null;
       micEnabled = false;
-      chunks = [];
+      segmentIndex = 0;
 
-      resolve({ audioBase64: base64, mimeType: 'audio/webm;codecs=opus' });
+      resolve({ stopped: true, finalSegmentIndex: finalIdx });
     };
 
+    // Calling stop() triggers one final ondataavailable with remaining data
     mediaRecorder.stop();
   });
 }

@@ -70,6 +70,22 @@ export interface Summary {
   created_at: string;
 }
 
+export type SegmentStatus = 'uploading' | 'uploaded' | 'transcribing' | 'transcribed' | 'failed';
+
+export interface RecordingSegment {
+  id: string;
+  recording_id: string;
+  segment_index: number;
+  storage_path: string;
+  status: SegmentStatus;
+  transcript_content: string | null;
+  speakers: Speaker[];
+  word_count: number | null;
+  last_speaker_id: number | null;
+  created_at: string;
+  transcribed_at: string | null;
+}
+
 export interface Database {
   public: {
     Tables: {

@@ -90,25 +90,18 @@ export class TabRecorder {
     await this.updateBadge();
   }
 
-  async stopRecording(): Promise<Blob> {
+  async stopRecording(): Promise<void> {
     if (!this.state.isRecording) {
       throw new Error('Not recording');
     }
 
-    const response = (await chrome.runtime.sendMessage({
+    await chrome.runtime.sendMessage({
       type: 'OFFSCREEN_STOP_RECORDING',
       target: 'offscreen',
-    })) as { audioBase64: string; mimeType: string };
+    });
 
     this.state = { ...INITIAL_STATE };
     await this.updateBadge();
-
-    const binary = atob(response.audioBase64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return new Blob([bytes], { type: response.mimeType });
   }
 
   getState(): RecordingState {

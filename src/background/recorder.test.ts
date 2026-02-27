@@ -194,28 +194,18 @@ describe('TabRecorder', () => {
   });
 
   describe('stopRecording', () => {
-    it('resets state and returns blob', async () => {
-      // Mock stop response with base64 audio
-      const testData = 'hello';
-      const base64 = btoa(testData);
+    it('resets state after stop', async () => {
       mockChrome.runtime.sendMessage.mockImplementation(
         (msg: { type: string; target?: string }) => {
           if (msg.type === 'OFFSCREEN_STOP_RECORDING') {
-            return Promise.resolve({
-              audioBase64: base64,
-              mimeType: 'audio/webm;codecs=opus',
-            });
+            return Promise.resolve({ stopped: true, finalSegmentIndex: 3 });
           }
           return Promise.resolve({ success: true });
         },
       );
 
       await recorder.startRecording(1);
-      const blob = await recorder.stopRecording();
-
-      expect(blob).toBeInstanceOf(Blob);
-      expect(blob.type).toBe('audio/webm;codecs=opus');
-      expect(blob.size).toBe(testData.length);
+      await recorder.stopRecording();
 
       const state = recorder.getState();
       expect(state.isRecording).toBe(false);
@@ -226,7 +216,7 @@ describe('TabRecorder', () => {
       mockChrome.runtime.sendMessage.mockImplementation(
         (msg: { type: string; target?: string }) => {
           if (msg.type === 'OFFSCREEN_STOP_RECORDING') {
-            return Promise.resolve({ audioBase64: btoa('x'), mimeType: 'audio/webm' });
+            return Promise.resolve({ stopped: true, finalSegmentIndex: 0 });
           }
           return Promise.resolve({ success: true });
         },
@@ -248,14 +238,10 @@ describe('TabRecorder', () => {
 
   describe('full lifecycle', () => {
     it('start → pause → resume → stop', async () => {
-      const base64 = btoa('audio-data');
       mockChrome.runtime.sendMessage.mockImplementation(
         (msg: { type: string; target?: string }) => {
           if (msg.type === 'OFFSCREEN_STOP_RECORDING') {
-            return Promise.resolve({
-              audioBase64: base64,
-              mimeType: 'audio/webm;codecs=opus',
-            });
+            return Promise.resolve({ stopped: true, finalSegmentIndex: 2 });
           }
           return Promise.resolve({ success: true });
         },
@@ -270,8 +256,7 @@ describe('TabRecorder', () => {
       await recorder.resumeRecording();
       expect(recorder.getState().isPaused).toBe(false);
 
-      const blob = await recorder.stopRecording();
-      expect(blob.size).toBeGreaterThan(0);
+      await recorder.stopRecording();
       expect(recorder.getState().isRecording).toBe(false);
     });
   });
