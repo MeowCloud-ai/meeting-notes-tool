@@ -9,7 +9,8 @@
     "storage",
     "identity",
     "activeTab",
-    "offscreen"
+    "offscreen",
+    "microphone"
   ],
   "host_permissions": [],
   "oauth2": {
