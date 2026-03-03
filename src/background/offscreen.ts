@@ -4,7 +4,7 @@
  * Emits segments every SEGMENT_DURATION_MS to background for upload.
  */
 
-export const DEFAULT_SEGMENT_DURATION_MS = 3 * 60 * 1000; // 3 minutes
+export const DEFAULT_SEGMENT_DURATION_MS = 1 * 60 * 1000; // 1 minute
 
 let mediaRecorder: MediaRecorder | null = null;
 let tabStream: MediaStream | null = null;
