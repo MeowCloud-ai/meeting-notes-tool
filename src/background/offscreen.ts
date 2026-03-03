@@ -67,15 +67,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function getMicStream(): Promise<MediaStream | null> {
   try {
-    return await navigator.mediaDevices.getUserMedia({
+    console.log('[MeowMeet] Requesting microphone access...');
+    const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
       },
     });
+    console.log('[MeowMeet] ✅ Microphone access granted, tracks:', stream.getAudioTracks().length);
+    return stream;
   } catch (err) {
-    console.warn('Microphone access denied or unavailable, recording tab audio only:', err);
+    console.warn('[MeowMeet] ❌ Microphone access FAILED:', err);
     return null;
   }
 }
@@ -139,6 +142,8 @@ async function handleStart(
   const shouldEnableMic = enableMic !== false;
   micStream = shouldEnableMic ? await getMicStream() : null;
   micEnabled = micStream !== null;
+
+  console.log(`[MeowMeet] Recording config: mic=${micEnabled}, tabTracks=${tabStream.getAudioTracks().length}, segmentMs=${segmentDurationMs}`);
 
   const { stream: mixedStream, ctx } = createMixedStream(tabStream, micStream);
   audioContext = ctx;
