@@ -58,10 +58,10 @@ export async function getTranscript(recordingId: string): Promise<Transcript | n
     .from('transcripts')
     .select('*')
     .eq('recording_id', recordingId)
-    .single();
+    .maybeSingle();
 
   if (error) return null;
-  return data as Transcript;
+  return data as Transcript | null;
 }
 
 export async function getSummary(recordingId: string): Promise<Summary | null> {
@@ -69,8 +69,8 @@ export async function getSummary(recordingId: string): Promise<Summary | null> {
     .from('summaries')
     .select('*')
     .eq('recording_id', recordingId)
-    .single();
+    .maybeSingle();
 
   if (error) return null;
-  return data as Summary;
+  return data as Summary | null;
 }
